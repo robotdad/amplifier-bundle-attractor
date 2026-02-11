@@ -1,7 +1,8 @@
 #!/bin/bash
 set -e
 
-BUNDLE_ROOT="/workspace/bkrabach/amplifier-bundle-attractor"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BUNDLE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 WORK_DIR="/tmp/attractor-e2e-$$"
 mkdir -p "$WORK_DIR"
 cd "$WORK_DIR"

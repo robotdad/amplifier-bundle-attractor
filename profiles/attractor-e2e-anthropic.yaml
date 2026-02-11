@@ -32,6 +32,10 @@ tools:
   - module: tool-report-outcome
     source: git+https://github.com/bkrabach/amplifier-bundle-attractor@main#subdirectory=modules/tool-report-outcome
 
+context:
+  - path: context/system-anthropic.md
+    role: system
+
 hooks:
   - module: hooks-tool-truncation
     source: git+https://github.com/bkrabach/amplifier-bundle-attractor@main#subdirectory=modules/hooks-tool-truncation

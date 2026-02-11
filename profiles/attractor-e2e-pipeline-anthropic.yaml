@@ -6,6 +6,11 @@ bundle:
 includes:
   - bundle: attractor:behaviors/attractor-core
 
+agents:
+  attractor-anthropic:
+    bundle: attractor:profiles/attractor-profile-anthropic
+    description: Anthropic coding agent (Claude) for pipeline nodes
+
 providers:
   - module: provider-anthropic
     source: git+https://github.com/microsoft/amplifier-module-provider-anthropic@main
@@ -20,6 +25,8 @@ session:
     source: ./modules/loop-pipeline
     config:
       dot_file: ./tests/e2e/fixtures/simple_file_creation.dot
+      profiles:
+        anthropic: attractor-anthropic
 
 tools:
   - module: tool-filesystem

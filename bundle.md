@@ -10,6 +10,17 @@ bundle:
 includes:
   - bundle: git+https://github.com/microsoft/amplifier-foundation@main
   - bundle: attractor:behaviors/attractor-core
+
+agents:
+  attractor-profile-anthropic:
+    bundle: attractor:profiles/attractor-profile-anthropic
+    description: Attractor coding agent with Anthropic provider
+  attractor-profile-openai:
+    bundle: attractor:profiles/attractor-profile-openai
+    description: Attractor coding agent with OpenAI provider
+  attractor-profile-gemini:
+    bundle: attractor:profiles/attractor-profile-gemini
+    description: Attractor coding agent with Gemini provider
 ---
 
 # Attractor

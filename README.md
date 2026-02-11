@@ -91,6 +91,21 @@ The `pyproject.toml` in each module points to `amplifier-core` via relative path
 amplifier-core = { path = "../../../amplifier-core", editable = true }
 ```
 
+## Module Source of Truth
+
+The canonical source for all Attractor modules is this bundle repository under `modules/`.
+Standalone module repositories (e.g., `amplifier-module-loop-agent`,
+`amplifier-module-loop-pipeline`, `amplifier-module-hooks-tool-truncation`) may exist
+in the `attractor-next` workspace or on GitHub but **may be stale or diverged**.
+
+Always develop against and submit changes to the copies in this bundle:
+
+- `modules/loop-agent/`
+- `modules/loop-pipeline/`
+- `modules/tool-apply-patch/`
+- `modules/tool-report-outcome/`
+- `modules/hooks-tool-truncation/`
+
 ## License
 
 MIT

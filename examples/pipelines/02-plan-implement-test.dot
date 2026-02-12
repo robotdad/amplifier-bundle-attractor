@@ -3,10 +3,13 @@
 // The classic plan -> implement -> test cycle.
 // Tests: multi-node traversal, multiple codergen handlers, goal_gate
 //        attribute, context updates flowing between stages.
+//
+// Prompts are intentionally simple so each completes in a single LLM call
+// (target: < 2 minutes total).
 
 digraph PlanImplementTest {
     graph [
-        goal="Build a Python function that calculates Fibonacci numbers",
+        goal="Build a Python add(a,b) function with a test",
         label="Plan-Implement-Test Pipeline"
     ]
     rankdir=LR
@@ -18,20 +21,20 @@ digraph PlanImplementTest {
     // Stage 1: Planning
     plan [
         label="Plan",
-        prompt="Create a detailed implementation plan for: $goal\nList the function signature, edge cases, and testing strategy."
+        prompt="List 3 steps to create a Python add(a,b) function with a test. Be brief — 1 sentence per step."
     ]
 
     // Stage 2: Implementation (this MUST succeed before pipeline can exit)
     implement [
         label="Implement",
-        prompt="Based on the previous plan, write the Python code to accomplish: $goal",
+        prompt="Create calculator.py with a function add(a,b) that returns a+b. Use write_file.",
         goal_gate=true
     ]
 
     // Stage 3: Testing
     test [
         label="Test",
-        prompt="Write and run pytest tests for the implementation. Verify correctness for edge cases including fib(0), fib(1), fib(10), and negative inputs."
+        prompt="Run python3 -c 'from calculator import add; assert add(1,2)==3; print(\"PASS\")' using the bash tool."
     ]
 
     // Linear flow through all three stages

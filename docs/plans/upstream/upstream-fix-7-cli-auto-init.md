@@ -288,7 +288,7 @@ in CI, Docker, or other non-TTY contexts."
 | **Branch** | `feat/auto-init-non-tty` |
 | **Commit messages** | 2 commits: auto-init in session_runner, init command TTY fix |
 | **Scope** | ~40 lines in 2 files + tests |
-| **Location note** | CLI source found at `/home/bkrabach/repos/deep-dive/amplifier-app-cli/` |
+| **Location note** | CLI source found at `/path/to/amplifier-app-cli/` |
 
 ## Dependencies
 

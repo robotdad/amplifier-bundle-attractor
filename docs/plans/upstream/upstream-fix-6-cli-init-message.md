@@ -140,7 +140,7 @@ auto-configure from environment variables."
 | **Branch** | `fix/init-tip-message` |
 | **Commit message** | `fix: correct misleading 'set API keys to skip this' tip message` |
 | **Scope** | 1-line text change + 1 test |
-| **Location note** | CLI source found at `/home/bkrabach/repos/deep-dive/amplifier-app-cli/` |
+| **Location note** | CLI source found at `/path/to/amplifier-app-cli/` |
 
 ## Dependencies
 

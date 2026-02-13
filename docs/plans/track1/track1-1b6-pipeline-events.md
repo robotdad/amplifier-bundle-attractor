@@ -94,7 +94,7 @@ def test_all_spec_event_constants_exist():
 
 **Step 2: Run to verify it fails**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_pipeline_events.py::test_all_spec_event_constants_exist -xvs`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_pipeline_events.py::test_all_spec_event_constants_exist -xvs`
 
 Expected: FAIL -- `Missing event constant: PIPELINE_PARALLEL_STARTED`
 
@@ -127,14 +127,14 @@ PIPELINE_STAGE_FAILED: str = "pipeline:stage_failed"
 
 **Step 4: Run the test**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_pipeline_events.py::test_all_spec_event_constants_exist -xvs`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_pipeline_events.py::test_all_spec_event_constants_exist -xvs`
 
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor
+cd /path/to/amplifier-bundle-attractor
 git add modules/loop-pipeline/amplifier_module_loop_pipeline/pipeline_events.py
 git add modules/loop-pipeline/tests/test_pipeline_events.py
 git commit -m "feat: add 9 missing pipeline event constants (H-10, spec 9.6)"
@@ -214,14 +214,14 @@ Replace with:
 
 **Step 4: Run tests to ensure nothing breaks**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/ -x --tb=short -q`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/ -x --tb=short -q`
 
 Expected: PASS (the hooks parameter is optional with `kwargs.get`)
 
 **Step 5: Commit**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor
+cd /path/to/amplifier-bundle-attractor
 git add modules/loop-pipeline/amplifier_module_loop_pipeline/handlers/__init__.py
 git add modules/loop-pipeline/amplifier_module_loop_pipeline/__init__.py
 git commit -m "refactor: pass hooks through HandlerRegistry to handlers (H-10)"
@@ -358,14 +358,14 @@ Before the `return _apply_join_policy(...)` call:
 
 **Step 3: Run tests**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_parallel.py -xvs`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_parallel.py -xvs`
 
 Expected: All PASS
 
 **Step 4: Commit**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor
+cd /path/to/amplifier-bundle-attractor
 git add modules/loop-pipeline/amplifier_module_loop_pipeline/handlers/parallel.py
 git add modules/loop-pipeline/tests/test_parallel.py
 git commit -m "feat: emit parallel lifecycle events from ParallelHandler (H-10)"
@@ -468,14 +468,14 @@ On timeout (if the handler has timeout logic):
 
 **Step 3: Run tests**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_human.py -xvs`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_human.py -xvs`
 
 Expected: All PASS
 
 **Step 4: Commit**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor
+cd /path/to/amplifier-bundle-attractor
 git add modules/loop-pipeline/amplifier_module_loop_pipeline/handlers/human.py
 git add modules/loop-pipeline/tests/test_human.py
 git commit -m "feat: emit interview lifecycle events from HumanGateHandler (H-10)"
@@ -620,20 +620,20 @@ Replace with:
 
 **Step 4: Run tests**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_retry.py -xvs`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_retry.py -xvs`
 
 Expected: All PASS
 
 **Step 5: Run full test suite**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/ -x --tb=short -q`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/ -x --tb=short -q`
 
 Expected: All PASS
 
 **Step 6: Commit**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor
+cd /path/to/amplifier-bundle-attractor
 git add modules/loop-pipeline/amplifier_module_loop_pipeline/retry.py
 git add modules/loop-pipeline/amplifier_module_loop_pipeline/engine.py
 git add modules/loop-pipeline/tests/test_retry.py

@@ -324,14 +324,14 @@ async def test_failure_routing_has_retry_limit(tmp_path):
 
 **Step 2: Run tests to verify they fail**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_failure_routing.py -xvs`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_failure_routing.py -xvs`
 
 Expected: `test_failure_routing_uses_node_retry_target` FAILS with `AssertionError: assert <StageStatus.FAIL> == <StageStatus.SUCCESS>`
 
 **Step 3: Commit failing tests**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor
+cd /path/to/amplifier-bundle-attractor
 git add modules/loop-pipeline/tests/test_failure_routing.py
 git commit -m "test: add per-node failure routing tests (H-6)"
 ```
@@ -444,20 +444,20 @@ Add this method to `PipelineEngine`, after `_check_goal_gates()` (around line 36
 
 **Step 4: Run the failure routing tests**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_failure_routing.py -xvs`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_failure_routing.py -xvs`
 
 Expected: All PASS
 
 **Step 5: Run the full test suite to check for regressions**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/ -x --tb=short -q`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/ -x --tb=short -q`
 
 Expected: All PASS
 
 **Step 6: Commit**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor
+cd /path/to/amplifier-bundle-attractor
 git add modules/loop-pipeline/amplifier_module_loop_pipeline/engine.py
 git commit -m "fix: implement per-node failure routing fallback chain (H-6)
 

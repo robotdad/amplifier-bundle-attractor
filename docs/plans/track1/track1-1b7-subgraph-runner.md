@@ -197,14 +197,14 @@ async def test_run_from_stops_at_dead_end(tmp_path):
 
 **Step 2: Run to verify tests fail**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_subgraph_runner.py -xvs`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_subgraph_runner.py -xvs`
 
 Expected: FAIL -- `AttributeError: 'PipelineEngine' object has no attribute '_run_from'`
 
 **Step 3: Commit failing tests**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor
+cd /path/to/amplifier-bundle-attractor
 git add modules/loop-pipeline/tests/test_subgraph_runner.py
 git commit -m "test: add subgraph runner tests (H-11)"
 ```
@@ -308,20 +308,20 @@ Add this method to `PipelineEngine`, after the `run()` method (before `_initiali
 
 **Step 2: Run the tests**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_subgraph_runner.py -xvs`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_subgraph_runner.py -xvs`
 
 Expected: All PASS
 
 **Step 3: Run full suite**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/ -x --tb=short -q`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/ -x --tb=short -q`
 
 Expected: All PASS
 
 **Step 4: Commit**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor
+cd /path/to/amplifier-bundle-attractor
 git add modules/loop-pipeline/amplifier_module_loop_pipeline/engine.py
 git commit -m "feat: add PipelineEngine._run_from() for subgraph execution (H-11)"
 ```
@@ -431,20 +431,20 @@ Replace with:
 
 **Step 3: Run the integration test**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_subgraph_runner.py::test_parallel_handler_uses_wired_subgraph_runner -xvs`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_subgraph_runner.py::test_parallel_handler_uses_wired_subgraph_runner -xvs`
 
 Expected: PASS
 
 **Step 4: Run the full test suite**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/ -x --tb=short -q`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/ -x --tb=short -q`
 
 Expected: All PASS
 
 **Step 5: Commit**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor
+cd /path/to/amplifier-bundle-attractor
 git add modules/loop-pipeline/amplifier_module_loop_pipeline/__init__.py
 git add modules/loop-pipeline/tests/test_subgraph_runner.py
 git commit -m "feat: wire subgraph_runner to ParallelHandler and ManagerLoopHandler (H-11)
@@ -504,14 +504,14 @@ async def test_manager_loop_uses_wired_subgraph_runner(tmp_path):
 
 **Step 2: Run test**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_subgraph_runner.py::test_manager_loop_uses_wired_subgraph_runner -xvs`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_subgraph_runner.py::test_manager_loop_uses_wired_subgraph_runner -xvs`
 
 Expected: PASS (ManagerLoopHandler already handles `subgraph_runner` correctly when it's not None)
 
 **Step 3: Commit**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor
+cd /path/to/amplifier-bundle-attractor
 git add modules/loop-pipeline/tests/test_subgraph_runner.py
 git commit -m "test: add ManagerLoopHandler subgraph runner integration test (H-11)"
 ```

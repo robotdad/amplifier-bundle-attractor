@@ -101,7 +101,7 @@ def test_transform_ordering_transforms_before_validate():
 
 **Step 2: Run test to verify it passes (baseline -- this test should pass already)**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_transforms.py::test_transform_ordering_transforms_before_validate -xvs`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_transforms.py::test_transform_ordering_transforms_before_validate -xvs`
 
 Expected: PASS (the test itself works; the ordering bug is in the orchestrator)
 
@@ -149,14 +149,14 @@ async def test_orchestrator_applies_transforms_before_validation():
 
 **Step 4: Run integration test**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_transforms.py::test_orchestrator_applies_transforms_before_validation -xvs`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_transforms.py::test_orchestrator_applies_transforms_before_validation -xvs`
 
 Expected: PASS (since the current graph is valid even without transforms; but this establishes the integration pattern)
 
 **Step 5: Commit test**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor
+cd /path/to/amplifier-bundle-attractor
 git add modules/loop-pipeline/tests/test_transforms.py
 git commit -m "test: add transform ordering tests (H-7)"
 ```
@@ -249,20 +249,20 @@ Update the subsequent comments in `__init__.py execute()` to reflect the new num
 
 **Step 5: Run all existing tests to verify nothing breaks**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/ -x --tb=short -q`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/ -x --tb=short -q`
 
 Expected: All tests PASS. Some tests may need minor adjustments if they relied on transforms happening inside engine.run() -- check test_engine.py and test_pipeline_e2e.py specifically.
 
 **Step 6: Run the new tests again**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_transforms.py -xvs`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_transforms.py -xvs`
 
 Expected: All PASS
 
 **Step 7: Commit**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor
+cd /path/to/amplifier-bundle-attractor
 git add modules/loop-pipeline/amplifier_module_loop_pipeline/__init__.py
 git add modules/loop-pipeline/amplifier_module_loop_pipeline/engine.py
 git commit -m "fix: apply transforms before validation (H-7, spec Section 9.1)

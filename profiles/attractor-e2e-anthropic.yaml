@@ -12,7 +12,7 @@ providers:
 session:
   orchestrator:
     module: loop-agent
-    source: git+https://github.com/bkrabach/amplifier-bundle-attractor@main#subdirectory=modules/loop-agent
+    source: git+https://github.com/microsoft/amplifier-bundle-attractor@main#subdirectory=modules/loop-agent
     config:
       max_tool_rounds_per_input: 20
       reasoning_effort: high
@@ -30,7 +30,7 @@ tools:
   - module: tool-search
     source: git+https://github.com/microsoft/amplifier-module-tool-search@main
   - module: tool-report-outcome
-    source: git+https://github.com/bkrabach/amplifier-bundle-attractor@main#subdirectory=modules/tool-report-outcome
+    source: git+https://github.com/microsoft/amplifier-bundle-attractor@main#subdirectory=modules/tool-report-outcome
 
 context:
   include:
@@ -38,4 +38,4 @@ context:
 
 hooks:
   - module: hooks-tool-truncation
-    source: git+https://github.com/bkrabach/amplifier-bundle-attractor@main#subdirectory=modules/hooks-tool-truncation
+    source: git+https://github.com/microsoft/amplifier-bundle-attractor@main#subdirectory=modules/hooks-tool-truncation

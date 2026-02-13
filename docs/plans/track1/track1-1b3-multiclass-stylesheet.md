@@ -123,14 +123,14 @@ def test_apply_stylesheet_multiclass_node():
 
 **Step 2: Run tests to verify they fail**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_stylesheet.py::test_selector_matches_single_class_in_multiclass_node -xvs`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_stylesheet.py::test_selector_matches_single_class_in_multiclass_node -xvs`
 
 Expected: FAIL on `assert _selector_matches(rule, "node1", "code,critical") is True`
 
 **Step 3: Commit failing tests**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor
+cd /path/to/amplifier-bundle-attractor
 git add modules/loop-pipeline/tests/test_stylesheet.py
 git commit -m "test: add multi-class stylesheet matching tests (H-8)"
 ```
@@ -184,20 +184,20 @@ def _selector_matches(rule: StyleRule, node_id: str, node_class: str) -> bool:
 
 **Step 2: Run the new stylesheet tests**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_stylesheet.py -xvs`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_stylesheet.py -xvs`
 
 Expected: All PASS (including existing tests)
 
 **Step 3: Run full test suite**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/ -x --tb=short -q`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/ -x --tb=short -q`
 
 Expected: All PASS
 
 **Step 4: Commit**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor
+cd /path/to/amplifier-bundle-attractor
 git add modules/loop-pipeline/amplifier_module_loop_pipeline/stylesheet.py
 git commit -m "fix: split comma-separated classes in stylesheet matching (H-8)
 

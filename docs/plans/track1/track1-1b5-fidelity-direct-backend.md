@@ -208,14 +208,14 @@ async def test_direct_backend_without_graph_falls_back_gracefully():
 
 **Step 2: Run tests to verify they fail**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_direct_backend_fidelity.py -xvs`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_direct_backend_fidelity.py -xvs`
 
 Expected: FAIL -- `run()` doesn't accept `incoming_edge` or `graph` kwargs (TypeError)
 
 **Step 3: Commit failing tests**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor
+cd /path/to/amplifier-bundle-attractor
 git add modules/loop-pipeline/tests/test_direct_backend_fidelity.py
 git commit -m "test: add fidelity-aware DirectProviderBackend tests (H-9)"
 ```
@@ -440,20 +440,20 @@ Find the `run()` method (lines 52-148) and replace entirely:
 
 **Step 2: Run the fidelity tests**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_direct_backend_fidelity.py -xvs`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_direct_backend_fidelity.py -xvs`
 
 Expected: All PASS
 
 **Step 3: Run the full test suite to check for regressions**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/ -x --tb=short -q`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/ -x --tb=short -q`
 
 Expected: All PASS. The backward-compatible `**kwargs` means existing callers that don't pass `incoming_edge`/`graph` still work.
 
 **Step 4: Commit**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor
+cd /path/to/amplifier-bundle-attractor
 git add modules/loop-pipeline/amplifier_module_loop_pipeline/__init__.py
 git commit -m "fix: wire fidelity into DirectProviderBackend (H-9)
 
@@ -494,14 +494,14 @@ outcome = await self._backend.run(node, prompt, context, graph=graph)
 
 **Step 3: Run full test suite**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/ -x --tb=short -q`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/ -x --tb=short -q`
 
 Expected: All PASS
 
 **Step 4: Commit**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor
+cd /path/to/amplifier-bundle-attractor
 git add modules/loop-pipeline/amplifier_module_loop_pipeline/handlers/codergen.py
 git commit -m "fix: pass graph to backend.run() from CodergenHandler (H-9)"
 ```

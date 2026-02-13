@@ -3,7 +3,7 @@
 > **Execution:** Use the subagent-driven-development workflow to implement this plan.
 
 **Goal:** Replace the hardcoded absolute path in `tests/e2e/run_e2e.sh` with dynamic resolution from the script's location so the E2E runner works in any environment.
-**Architecture:** The script currently hardcodes `BUNDLE_ROOT="/workspace/bkrabach/amplifier-bundle-attractor"` which only works in one specific container. Replace with standard shell idiom `$(cd "$(dirname "$0")" && pwd)` to derive the bundle root relative to the script's own location (`tests/e2e/` is two levels below bundle root).
+**Architecture:** The script currently hardcodes `BUNDLE_ROOT="/workspace/microsoft/amplifier-bundle-attractor"` which only works in one specific container. Replace with standard shell idiom `$(cd "$(dirname "$0")" && pwd)` to derive the bundle root relative to the script's own location (`tests/e2e/` is two levels below bundle root).
 **Tech Stack:** Bash, POSIX shell path resolution
 
 ---
@@ -13,7 +13,7 @@
 Line 4 of `tests/e2e/run_e2e.sh` contains:
 
 ```bash
-BUNDLE_ROOT="/workspace/bkrabach/amplifier-bundle-attractor"
+BUNDLE_ROOT="/workspace/microsoft/amplifier-bundle-attractor"
 ```
 
 This is a hardcoded container/workspace-specific path. The script fails in any other environment (local dev, CI, different container mounts) because the path doesn't exist.
@@ -39,7 +39,7 @@ The script was written for a specific workspace container layout and the path wa
 
 Find line 4:
 ```bash
-BUNDLE_ROOT="/workspace/bkrabach/amplifier-bundle-attractor"
+BUNDLE_ROOT="/workspace/microsoft/amplifier-bundle-attractor"
 ```
 
 Replace with:
@@ -79,7 +79,7 @@ Expected: No matches (zero output).
 ```
 fix(e2e): use relative path resolution in run_e2e.sh
 
-Replace hardcoded BUNDLE_ROOT="/workspace/bkrabach/..." with
+Replace hardcoded BUNDLE_ROOT="/path/to/..." with
 dynamic resolution from the script's own location. The script
 lives at tests/e2e/, so the bundle root is two levels up.
 

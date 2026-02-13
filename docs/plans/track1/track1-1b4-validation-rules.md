@@ -134,14 +134,14 @@ def _make_graph(edges_extra=None, nodes_extra=None, graph_attrs=None):
 
 **Step 2: Run to verify tests fail**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_validation.py::test_condition_syntax_invalid_condition_is_error -xvs`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_validation.py::test_condition_syntax_invalid_condition_is_error -xvs`
 
 Expected: FAIL -- `assert len(condition_diags) == 1` fails because the rule doesn't exist yet
 
 **Step 3: Commit**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor
+cd /path/to/amplifier-bundle-attractor
 git add modules/loop-pipeline/tests/test_validation.py
 git commit -m "test: add condition_syntax validation tests (C-10)"
 ```
@@ -207,7 +207,7 @@ In the `validate()` function, add after `_check_prompt_on_llm_nodes(graph, diags
 
 **Step 4: Run condition_syntax tests**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_validation.py -k "condition_syntax" -xvs`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_validation.py -k "condition_syntax" -xvs`
 
 Expected: All PASS
 
@@ -322,7 +322,7 @@ Register in `validate()`:
 
 **Step 3: Run tests**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_validation.py -k "stylesheet_syntax" -xvs`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_validation.py -k "stylesheet_syntax" -xvs`
 
 Expected: All PASS
 
@@ -431,7 +431,7 @@ Register in `validate()`:
 
 **Step 3: Run tests**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_validation.py -k "type_known" -xvs`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_validation.py -k "type_known" -xvs`
 
 Expected: All PASS
 
@@ -580,7 +580,7 @@ Register in `validate()`:
 
 **Step 3: Run tests**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_validation.py -k "fidelity_valid" -xvs`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_validation.py -k "fidelity_valid" -xvs`
 
 Expected: All PASS
 
@@ -701,13 +701,13 @@ Register in `validate()`:
 
 **Step 3: Run tests**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_validation.py -k "retry_target_exists" -xvs`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/test_validation.py -k "retry_target_exists" -xvs`
 
 Expected: All PASS
 
 **Step 4: Run full test suite**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/ -x --tb=short -q`
+Run: `cd /path/to/amplifier-bundle-attractor && python -m pytest modules/loop-pipeline/tests/ -x --tb=short -q`
 
 Expected: All PASS
 

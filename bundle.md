@@ -33,7 +33,7 @@ Use a provider-specific profile for a complete configuration:
 
 ```yaml
 includes:
-  - bundle: git+https://github.com/bkrabach/amplifier-bundle-attractor@main#subdirectory=profiles/attractor-profile-anthropic
+  - bundle: git+https://github.com/microsoft/amplifier-bundle-attractor@main#subdirectory=profiles/attractor-profile-anthropic
 ```
 
 ## Available Profiles

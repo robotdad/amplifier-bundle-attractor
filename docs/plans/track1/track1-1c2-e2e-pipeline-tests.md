@@ -52,7 +52,7 @@ This ensures `./modules/loop-pipeline` and other local sources are properly set 
 
 Run:
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && bash tests/e2e/run_e2e.sh
+cd /path/to/amplifier-bundle-attractor && bash tests/e2e/run_e2e.sh
 ```
 Expected: All 3 existing agent tests pass. The `amplifier init` step completes without error.
 
@@ -124,7 +124,7 @@ Key design decisions:
 
 Run:
 ```bash
-bash -n /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/tests/e2e/run_e2e.sh
+bash -n /path/to/amplifier-bundle-attractor/tests/e2e/run_e2e.sh
 ```
 Expected: No syntax errors (exit 0).
 
@@ -256,7 +256,7 @@ The `simple_file_creation.dot` fixture has one `implement` node with `goal_gate=
 
 Run:
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && bash tests/e2e/run_e2e.sh
+cd /path/to/amplifier-bundle-attractor && bash tests/e2e/run_e2e.sh
 ```
 Expected: The pipeline test runs (may take 30-60s for LLM call), `hello.py` is created in the test working directory.
 
@@ -297,7 +297,7 @@ The `plan_implement_review.dot` fixture has 3 action nodes: plan, implement (wit
 
 Run:
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && bash tests/e2e/run_e2e.sh
+cd /path/to/amplifier-bundle-attractor && bash tests/e2e/run_e2e.sh
 ```
 Expected: Pipeline executes all 3 nodes, `test_math.py` exists with `def add`.
 
@@ -338,7 +338,7 @@ The `conditional_routing.dot` fixture has a diamond gate node. If the test passe
 
 Run:
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && bash tests/e2e/run_e2e.sh
+cd /path/to/amplifier-bundle-attractor && bash tests/e2e/run_e2e.sh
 ```
 Expected: Pipeline executes, `calc.py` exists with `def multiply`. The gate node routes to `done` on success.
 
@@ -385,7 +385,7 @@ echo "========================================="
 
 Run:
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor && bash tests/e2e/run_e2e.sh
+cd /path/to/amplifier-bundle-attractor && bash tests/e2e/run_e2e.sh
 ```
 Expected: 6 tests total (3 agent + 3 pipeline). Output shows both sections with labeled results. `exit $FAIL` at the end returns the correct count.
 

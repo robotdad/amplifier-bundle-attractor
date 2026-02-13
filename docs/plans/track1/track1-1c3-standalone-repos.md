@@ -59,7 +59,7 @@ Search GitHub and the local codebase for any imports or references to the standa
 
 ```bash
 # Check if any profile or bundle YAML references the standalone repos
-cd /home/bkrabach/dev/attractor-next
+cd /path/to/workspace
 grep -r "amplifier-module-loop-agent" amplifier-bundle-attractor/ --include="*.yaml" --include="*.yml" --include="*.toml" | grep -v ".venv"
 grep -r "amplifier-module-loop-pipeline" amplifier-bundle-attractor/ --include="*.yaml" --include="*.yml" --include="*.toml" | grep -v ".venv"
 
@@ -89,12 +89,12 @@ No commit needed (investigation only). Document findings in PR description.
 ### Task 2: Add Deprecation README to Standalone `loop-agent` Repo
 
 **Files:**
-- Modify: `/home/bkrabach/dev/attractor-next/amplifier-module-loop-agent/README.md`
+- Modify: `/path/to/amplifier-module-loop-agent/README.md`
 
 **Step 1: Read the current README**
 
 ```bash
-cat /home/bkrabach/dev/attractor-next/amplifier-module-loop-agent/README.md
+cat /path/to/amplifier-module-loop-agent/README.md
 ```
 
 **Step 2: Replace README with deprecation notice**
@@ -149,14 +149,14 @@ This repository has been archived. No further commits, issues, or PRs will be ac
 **Step 3: Verify the file**
 
 ```bash
-head -5 /home/bkrabach/dev/attractor-next/amplifier-module-loop-agent/README.md
+head -5 /path/to/amplifier-module-loop-agent/README.md
 ```
 Expected: First line is `# amplifier-module-loop-agent`, second line is blank, third starts with `> **DEPRECATED**`.
 
 **Step 4: Commit (in the standalone repo)**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-module-loop-agent
+cd /path/to/amplifier-module-loop-agent
 git add README.md
 git commit -m "docs: deprecate standalone repo in favor of bundle copy
 
@@ -179,12 +179,12 @@ Part of: Track 1 Phase 1C - standalone repo deprecation (H-12)"
 ### Task 3: Add Deprecation README to Standalone `loop-pipeline` Repo
 
 **Files:**
-- Modify: `/home/bkrabach/dev/attractor-next/amplifier-module-loop-pipeline/README.md`
+- Modify: `/path/to/amplifier-module-loop-pipeline/README.md`
 
 **Step 1: Read the current README**
 
 ```bash
-cat /home/bkrabach/dev/attractor-next/amplifier-module-loop-pipeline/README.md
+cat /path/to/amplifier-module-loop-pipeline/README.md
 ```
 
 **Step 2: Replace README with deprecation notice**
@@ -239,14 +239,14 @@ This repository has been archived. No further commits, issues, or PRs will be ac
 **Step 3: Verify the file**
 
 ```bash
-head -5 /home/bkrabach/dev/attractor-next/amplifier-module-loop-pipeline/README.md
+head -5 /path/to/amplifier-module-loop-pipeline/README.md
 ```
 Expected: First line is `# amplifier-module-loop-pipeline`, third line starts with `> **DEPRECATED**`.
 
 **Step 4: Commit (in the standalone repo)**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-module-loop-pipeline
+cd /path/to/amplifier-module-loop-pipeline
 git add README.md
 git commit -m "docs: deprecate standalone repo in favor of bundle copy
 
@@ -270,14 +270,14 @@ Part of: Track 1 Phase 1C - standalone repo deprecation (H-12)"
 ### Task 4: Add Deprecation Warning to Standalone pyproject.toml Files
 
 **Files:**
-- Modify: `/home/bkrabach/dev/attractor-next/amplifier-module-loop-agent/pyproject.toml`
-- Modify: `/home/bkrabach/dev/attractor-next/amplifier-module-loop-pipeline/pyproject.toml`
+- Modify: `/path/to/amplifier-module-loop-agent/pyproject.toml`
+- Modify: `/path/to/amplifier-module-loop-pipeline/pyproject.toml`
 
 **Step 1: Read both pyproject.toml files**
 
 ```bash
-cat /home/bkrabach/dev/attractor-next/amplifier-module-loop-agent/pyproject.toml
-cat /home/bkrabach/dev/attractor-next/amplifier-module-loop-pipeline/pyproject.toml
+cat /path/to/amplifier-module-loop-agent/pyproject.toml
+cat /path/to/amplifier-module-loop-pipeline/pyproject.toml
 ```
 
 **Step 2: Add deprecation classifiers and update descriptions**
@@ -303,21 +303,21 @@ classifiers = [
 **Step 3: Verify TOML is still valid**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-module-loop-agent && python3 -c "import tomllib; tomllib.load(open('pyproject.toml','rb')); print('OK')"
-cd /home/bkrabach/dev/attractor-next/amplifier-module-loop-pipeline && python3 -c "import tomllib; tomllib.load(open('pyproject.toml','rb')); print('OK')"
+cd /path/to/amplifier-module-loop-agent && python3 -c "import tomllib; tomllib.load(open('pyproject.toml','rb')); print('OK')"
+cd /path/to/amplifier-module-loop-pipeline && python3 -c "import tomllib; tomllib.load(open('pyproject.toml','rb')); print('OK')"
 ```
 Expected: Both print "OK".
 
 **Step 4: Commit (in each standalone repo)**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-module-loop-agent
+cd /path/to/amplifier-module-loop-agent
 git add pyproject.toml
 git commit -m "chore: mark pyproject.toml as deprecated (Development Status :: 7 - Inactive)
 
 Part of: Track 1 Phase 1C - standalone repo deprecation (H-12)"
 
-cd /home/bkrabach/dev/attractor-next/amplifier-module-loop-pipeline
+cd /path/to/amplifier-module-loop-pipeline
 git add pyproject.toml
 git commit -m "chore: mark pyproject.toml as deprecated (Development Status :: 7 - Inactive)
 
@@ -334,10 +334,10 @@ Part of: Track 1 Phase 1C - standalone repo deprecation (H-12)"
 **Step 1: Push deprecation commits to both repos**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-module-loop-agent
+cd /path/to/amplifier-module-loop-agent
 git push origin main
 
-cd /home/bkrabach/dev/attractor-next/amplifier-module-loop-pipeline
+cd /path/to/amplifier-module-loop-pipeline
 git push origin main
 ```
 
@@ -366,8 +366,8 @@ Expected: Both return `true`.
 ### Task 6: Add "Source of Truth" Notice to Bundle Module READMEs
 
 **Files:**
-- Create: `/home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/modules/loop-agent/README.md`
-- Create: `/home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/modules/loop-pipeline/README.md`
+- Create: `/path/to/amplifier-bundle-attractor/modules/loop-agent/README.md`
+- Create: `/path/to/amplifier-bundle-attractor/modules/loop-pipeline/README.md`
 
 **Step 1: Create the loop-agent bundle README**
 
@@ -448,15 +448,15 @@ uv run pytest tests/ -v
 **Step 3: Verify files exist**
 
 ```bash
-test -f /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/modules/loop-agent/README.md && echo "OK"
-test -f /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/modules/loop-pipeline/README.md && echo "OK"
+test -f /path/to/amplifier-bundle-attractor/modules/loop-agent/README.md && echo "OK"
+test -f /path/to/amplifier-bundle-attractor/modules/loop-pipeline/README.md && echo "OK"
 ```
 Expected: Both print "OK".
 
 **Step 4: Commit (in the bundle repo)**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor
+cd /path/to/amplifier-bundle-attractor
 git add modules/loop-agent/README.md modules/loop-pipeline/README.md
 git commit -m "docs: add source-of-truth READMEs to bundle module copies
 
@@ -477,7 +477,7 @@ Part of: Track 1 Phase 1C - standalone repo deprecation (H-12)"
 **Step 1: Search all profiles for standalone git references**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor
+cd /path/to/amplifier-bundle-attractor
 grep -rn "amplifier-module-loop-agent" profiles/ || echo "No references found (good)"
 grep -rn "amplifier-module-loop-pipeline" profiles/ || echo "No references found (good)"
 ```

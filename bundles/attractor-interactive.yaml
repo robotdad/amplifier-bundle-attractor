@@ -1,0 +1,69 @@
+# Interactive Attractor session with pipeline execution capability.
+#
+# This bundle creates an interactive coding agent that can also invoke
+# DOT graph pipelines at runtime via the run_pipeline tool. Combines:
+# - An interactive agent loop (loop-agent) for conversation
+# - The run_pipeline tool for pipeline invocation
+# - Pipeline-awareness context so the agent knows about pipelines
+# - The pipeline-runner agent registered for spawning
+
+bundle:
+  name: attractor-interactive
+  version: 0.1.0
+  description: >
+    Interactive Attractor session with pipeline execution capabilities.
+    An agent that can converse normally AND invoke DOT graph pipelines
+    on demand via the run_pipeline tool.
+
+includes:
+  - bundle: attractor:behaviors/attractor-core
+  - bundle: git+https://github.com/microsoft/amplifier-foundation@main
+
+# Interactive session provider
+providers:
+  - module: provider-anthropic
+    source: git+https://github.com/microsoft/amplifier-module-provider-anthropic@main
+    config:
+      default_model: claude-sonnet-4-20250514
+
+# Interactive agent loop (not pipeline — the user talks to this)
+session:
+  orchestrator:
+    module: loop-agent
+    source: ../modules/loop-agent
+    config:
+      max_tool_rounds_per_input: 50
+      default_command_timeout_ms: 120000
+  context:
+    module: context-simple
+    source: git+https://github.com/microsoft/amplifier-module-context-simple@main
+
+# Tools: standard coding tools + pipeline runner
+tools:
+  - module: tool-filesystem
+    source: git+https://github.com/microsoft/amplifier-module-tool-filesystem@main
+  - module: tool-bash
+    source: git+https://github.com/microsoft/amplifier-module-tool-bash@main
+    config:
+      timeout: 120
+  - module: tool-search
+    source: git+https://github.com/microsoft/amplifier-module-tool-search@main
+  - module: tool-pipeline-run
+    source: ../modules/tool-pipeline-run
+    config:
+      runner_agent: attractor-pipeline-runner
+      profiles:
+        anthropic: attractor-agent-anthropic
+        openai: attractor-agent-openai
+        gemini: attractor-agent-gemini
+
+# Context: standard system prompt + pipeline awareness
+context:
+  include:
+    - context/system-anthropic.md
+    - context/pipeline-awareness.md
+
+# The pipeline runner agent (spawned by tool-pipeline-run)
+agents:
+  attractor-pipeline-runner:
+    bundle: attractor:agents/pipeline-runner

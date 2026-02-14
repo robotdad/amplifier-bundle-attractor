@@ -8,10 +8,11 @@ bundle:
     structured as a graph of phases, sufficient for use in a Software Factory.
 
     Entry points:
-      bundles/attractor-pipeline  — Multi-provider pipeline (route nodes to
-                                    Anthropic, OpenAI, or Gemini via model stylesheet)
-      bundles/attractor-agent     — Standalone coding agent (defaults to Anthropic)
-      profiles/*                  — Provider-specific single-agent profiles
+      bundles/attractor-pipeline    — Multi-provider pipeline (route nodes to
+                                      Anthropic, OpenAI, or Gemini via model stylesheet)
+      bundles/attractor-interactive — Interactive agent with pipeline tool
+      bundles/attractor-agent       — Standalone coding agent (defaults to Anthropic)
+      profiles/*                    — Provider-specific single-agent profiles
 
 includes:
   - bundle: git+https://github.com/microsoft/amplifier-foundation@main
@@ -27,6 +28,9 @@ agents:
   attractor-profile-gemini:
     bundle: attractor:profiles/attractor-profile-gemini
     description: Attractor coding agent with Gemini provider
+  attractor-pipeline-runner:
+    bundle: attractor:agents/pipeline-runner
+    description: Pipeline execution agent spawned by run_pipeline tool
 ---
 
 # Attractor
@@ -89,9 +93,12 @@ includes:
 
 ```
 attractor/
+├── agents/                     # Spawnable agent definitions
+│   └── pipeline-runner.yaml    # Pipeline execution agent (spawned by tool)
 ├── bundles/                    # Composed entry points
-│   ├── attractor-pipeline.yaml # Multi-provider pipeline (primary)
-│   └── attractor-agent.yaml    # Standalone single agent
+│   ├── attractor-pipeline.yaml     # Multi-provider pipeline (primary)
+│   ├── attractor-interactive.yaml  # Interactive agent with pipeline tool
+│   └── attractor-agent.yaml        # Standalone single agent
 ├── profiles/                   # Provider-specific agent profiles
 │   ├── attractor-profile-anthropic.yaml
 │   ├── attractor-profile-openai.yaml
@@ -101,12 +108,14 @@ attractor/
 ├── modules/                    # Custom Amplifier modules
 │   ├── loop-pipeline/          # DOT graph-driven pipeline orchestrator
 │   ├── loop-agent/             # Agent loop orchestrator
+│   ├── tool-pipeline-run/      # Runtime pipeline invocation tool
 │   ├── tool-report-outcome/    # Pipeline outcome reporting tool
 │   ├── tool-apply-patch/       # Patch-based file editing (OpenAI)
 │   └── hooks-tool-truncation/  # Tool output truncation hook
 ├── context/                    # System prompts per provider
 │   ├── system-anthropic.md
 │   ├── system-openai.md
-│   └── system-gemini.md
+│   ├── system-gemini.md
+│   └── pipeline-awareness.md   # Pipeline tool usage context
 └── examples/pipelines/         # Example DOT pipeline graphs
 ```

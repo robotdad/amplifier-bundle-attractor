@@ -63,7 +63,149 @@ context:
     - context/system-anthropic.md
     - context/pipeline-awareness.md
 
-# The pipeline runner agent (spawned by tool-pipeline-run)
+# The pipeline runner agent (spawned by tool-pipeline-run).
+# Inlined here because `bundle:` agent references are not resolved by the
+# foundation's _parse_agents() — the spawner would receive a bare dict with
+# no session/providers/tools, falling back to the parent's loop-agent.
 agents:
   attractor-pipeline-runner:
-    bundle: attractor:agents/pipeline-runner
+    description: >
+      Pipeline execution agent. Spawned by the run_pipeline tool to execute
+      a DOT graph pipeline. Uses loop-pipeline orchestrator with all three
+      provider profiles available for model stylesheet routing.
+    providers:
+      - module: provider-anthropic
+        source: git+https://github.com/microsoft/amplifier-module-provider-anthropic@main
+        config:
+          default_model: claude-sonnet-4-20250514
+    session:
+      orchestrator:
+        module: loop-pipeline
+        source: git+https://github.com/microsoft/amplifier-bundle-attractor@main#subdirectory=modules/loop-pipeline
+        config:
+          profiles:
+            anthropic: attractor-agent-anthropic
+            openai: attractor-agent-openai
+            gemini: attractor-agent-gemini
+      context:
+        module: context-simple
+        source: git+https://github.com/microsoft/amplifier-module-context-simple@main
+    includes:
+      - bundle: attractor:behaviors/attractor-core
+    tools:
+      - module: tool-filesystem
+        source: git+https://github.com/microsoft/amplifier-module-tool-filesystem@main
+      - module: tool-bash
+        source: git+https://github.com/microsoft/amplifier-module-tool-bash@main
+        config:
+          timeout: 120
+      - module: tool-search
+        source: git+https://github.com/microsoft/amplifier-module-tool-search@main
+
+  # Anthropic coding agent (Claude Code aligned)
+  # Uses edit_file with old_string/new_string, 120s shell timeout
+  attractor-agent-anthropic:
+    providers:
+      - module: provider-anthropic
+        source: git+https://github.com/microsoft/amplifier-module-provider-anthropic@main
+        config:
+          default_model: claude-sonnet-4-20250514
+          timeout: 600
+    session:
+      orchestrator:
+        module: loop-agent
+        source: git+https://github.com/microsoft/amplifier-bundle-attractor@main#subdirectory=modules/loop-agent
+        config:
+          max_tool_rounds_per_input: 50
+          default_command_timeout_ms: 120000
+      context:
+        module: context-simple
+        source: git+https://github.com/microsoft/amplifier-module-context-simple@main
+    includes:
+      - bundle: attractor:behaviors/attractor-core
+    tools:
+      - module: tool-filesystem
+        source: git+https://github.com/microsoft/amplifier-module-tool-filesystem@main
+      - module: tool-bash
+        source: git+https://github.com/microsoft/amplifier-module-tool-bash@main
+        config:
+          timeout: 120
+      - module: tool-search
+        source: git+https://github.com/microsoft/amplifier-module-tool-search@main
+    context:
+      include:
+        - context/system-anthropic.md
+
+  # OpenAI coding agent (codex-rs aligned)
+  # Uses apply_patch for edits, restricted filesystem, 10s shell timeout
+  attractor-agent-openai:
+    providers:
+      - module: provider-openai
+        source: git+https://github.com/microsoft/amplifier-module-provider-openai@main
+        config:
+          default_model: gpt-4.1
+          timeout: 600
+    session:
+      orchestrator:
+        module: loop-agent
+        source: git+https://github.com/microsoft/amplifier-bundle-attractor@main#subdirectory=modules/loop-agent
+        config:
+          max_tool_rounds_per_input: 50
+          default_command_timeout_ms: 120000
+      context:
+        module: context-simple
+        source: git+https://github.com/microsoft/amplifier-module-context-simple@main
+    includes:
+      - bundle: attractor:behaviors/attractor-core
+    tools:
+      - module: tool-apply-patch
+        source: git+https://github.com/microsoft/amplifier-bundle-attractor@main#subdirectory=modules/tool-apply-patch
+      - module: tool-filesystem
+        source: git+https://github.com/microsoft/amplifier-module-tool-filesystem@main
+        config:
+          expose: [read_file, write_file]
+      - module: tool-bash
+        source: git+https://github.com/microsoft/amplifier-module-tool-bash@main
+        config:
+          timeout: 120
+      - module: tool-search
+        source: git+https://github.com/microsoft/amplifier-module-tool-search@main
+    context:
+      include:
+        - context/system-openai.md
+
+  # Gemini coding agent (gemini-cli aligned)
+  # Uses edit_file, includes web tools for grounding
+  attractor-agent-gemini:
+    providers:
+      - module: provider-gemini
+        source: git+https://github.com/microsoft/amplifier-module-provider-gemini@main
+        config:
+          default_model: gemini-2.5-pro
+          timeout: 600
+    session:
+      orchestrator:
+        module: loop-agent
+        source: git+https://github.com/microsoft/amplifier-bundle-attractor@main#subdirectory=modules/loop-agent
+        config:
+          max_tool_rounds_per_input: 50
+          default_command_timeout_ms: 120000
+      context:
+        module: context-simple
+        source: git+https://github.com/microsoft/amplifier-module-context-simple@main
+    includes:
+      - bundle: attractor:behaviors/attractor-core
+    tools:
+      - module: tool-filesystem
+        source: git+https://github.com/microsoft/amplifier-module-tool-filesystem@main
+      - module: tool-bash
+        source: git+https://github.com/microsoft/amplifier-module-tool-bash@main
+        config:
+          timeout: 120
+      - module: tool-search
+        source: git+https://github.com/microsoft/amplifier-module-tool-search@main
+      - module: tool-web
+        source: git+https://github.com/microsoft/amplifier-module-tool-web@main
+    context:
+      include:
+        - context/system-gemini.md

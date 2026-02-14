@@ -1,0 +1,157 @@
+# Pipeline runner agent — spawned by tool-pipeline-run to execute DOT pipelines.
+#
+# This agent uses loop-pipeline as its orchestrator. The DOT source and goal
+# are injected at spawn time via orchestrator_config. It has all three
+# provider profiles as child agents so the model stylesheet can route nodes
+# to any provider.
+
+bundle:
+  name: attractor-pipeline-runner
+  version: 0.1.0
+  description: >
+    Pipeline execution agent. Spawned by the run_pipeline tool to execute
+    a DOT graph pipeline. Uses loop-pipeline orchestrator with all three
+    provider profiles available for model stylesheet routing.
+
+includes:
+  - bundle: attractor:behaviors/attractor-core
+
+# The orchestrator provider (used for pipeline orchestrator reasoning).
+# This is the LLM that the pipeline engine itself uses, not the per-node LLMs.
+providers:
+  - module: provider-anthropic
+    source: git+https://github.com/microsoft/amplifier-module-provider-anthropic@main
+    config:
+      default_model: claude-sonnet-4-20250514
+
+# Pipeline orchestrator session.
+# dot_source or dot_file is injected at spawn time via orchestrator_config.
+session:
+  orchestrator:
+    module: loop-pipeline
+    source: ../modules/loop-pipeline
+    config:
+      # Profiles map llm_provider values to child agent names.
+      profiles:
+        anthropic: attractor-agent-anthropic
+        openai: attractor-agent-openai
+        gemini: attractor-agent-gemini
+  context:
+    module: context-simple
+    source: git+https://github.com/microsoft/amplifier-module-context-simple@main
+
+# Orchestrator-level tools (filesystem access for the pipeline engine itself)
+tools:
+  - module: tool-filesystem
+    source: git+https://github.com/microsoft/amplifier-module-tool-filesystem@main
+  - module: tool-bash
+    source: git+https://github.com/microsoft/amplifier-module-tool-bash@main
+    config:
+      timeout: 120
+  - module: tool-search
+    source: git+https://github.com/microsoft/amplifier-module-tool-search@main
+
+# Child agents (one per provider) — spawned by the pipeline engine per node.
+# These are identical to the agents in bundles/attractor-pipeline.yaml.
+agents:
+  attractor-agent-anthropic:
+    providers:
+      - module: provider-anthropic
+        source: git+https://github.com/microsoft/amplifier-module-provider-anthropic@main
+        config:
+          default_model: claude-sonnet-4-20250514
+          timeout: 600
+    session:
+      orchestrator:
+        module: loop-agent
+        source: ../modules/loop-agent
+        config:
+          max_tool_rounds_per_input: 50
+          default_command_timeout_ms: 120000
+      context:
+        module: context-simple
+        source: git+https://github.com/microsoft/amplifier-module-context-simple@main
+    includes:
+      - bundle: attractor:behaviors/attractor-core
+    tools:
+      - module: tool-filesystem
+        source: git+https://github.com/microsoft/amplifier-module-tool-filesystem@main
+      - module: tool-bash
+        source: git+https://github.com/microsoft/amplifier-module-tool-bash@main
+        config:
+          timeout: 120
+      - module: tool-search
+        source: git+https://github.com/microsoft/amplifier-module-tool-search@main
+    context:
+      include:
+        - context/system-anthropic.md
+
+  attractor-agent-openai:
+    providers:
+      - module: provider-openai
+        source: git+https://github.com/microsoft/amplifier-module-provider-openai@main
+        config:
+          default_model: gpt-4.1
+          timeout: 600
+    session:
+      orchestrator:
+        module: loop-agent
+        source: ../modules/loop-agent
+        config:
+          max_tool_rounds_per_input: 50
+          default_command_timeout_ms: 120000
+      context:
+        module: context-simple
+        source: git+https://github.com/microsoft/amplifier-module-context-simple@main
+    includes:
+      - bundle: attractor:behaviors/attractor-core
+    tools:
+      - module: tool-apply-patch
+        source: ../modules/tool-apply-patch
+      - module: tool-filesystem
+        source: git+https://github.com/microsoft/amplifier-module-tool-filesystem@main
+        config:
+          expose: [read_file, write_file]
+      - module: tool-bash
+        source: git+https://github.com/microsoft/amplifier-module-tool-bash@main
+        config:
+          timeout: 120
+      - module: tool-search
+        source: git+https://github.com/microsoft/amplifier-module-tool-search@main
+    context:
+      include:
+        - context/system-openai.md
+
+  attractor-agent-gemini:
+    providers:
+      - module: provider-gemini
+        source: git+https://github.com/microsoft/amplifier-module-provider-gemini@main
+        config:
+          default_model: gemini-2.5-pro
+          timeout: 600
+    session:
+      orchestrator:
+        module: loop-agent
+        source: ../modules/loop-agent
+        config:
+          max_tool_rounds_per_input: 50
+          default_command_timeout_ms: 120000
+      context:
+        module: context-simple
+        source: git+https://github.com/microsoft/amplifier-module-context-simple@main
+    includes:
+      - bundle: attractor:behaviors/attractor-core
+    tools:
+      - module: tool-filesystem
+        source: git+https://github.com/microsoft/amplifier-module-tool-filesystem@main
+      - module: tool-bash
+        source: git+https://github.com/microsoft/amplifier-module-tool-bash@main
+        config:
+          timeout: 120
+      - module: tool-search
+        source: git+https://github.com/microsoft/amplifier-module-tool-search@main
+      - module: tool-web
+        source: git+https://github.com/microsoft/amplifier-module-tool-web@main
+    context:
+      include:
+        - context/system-gemini.md

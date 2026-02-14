@@ -1,0 +1,46 @@
+bundle:
+  name: attractor-agent
+  version: 0.1.0
+  description: >
+    Standalone Attractor coding agent (no pipeline). Defaults to Anthropic
+    (Claude Code aligned) but the user can override via provider_preferences
+    at the CLI. Includes amplifier-foundation for standalone use.
+
+    Usage:
+      amplifier run --bundle attractor:bundles/attractor-agent
+      amplifier run --bundle attractor:bundles/attractor-agent --provider openai
+
+includes:
+  - bundle: git+https://github.com/microsoft/amplifier-foundation@main
+  - bundle: attractor:behaviors/attractor-core
+
+# --- Default provider (Anthropic) -------------------------------------------
+providers:
+  - module: provider-anthropic
+    source: git+https://github.com/microsoft/amplifier-module-provider-anthropic@main
+    config:
+      default_model: claude-sonnet-4-20250514
+
+# --- Agent loop orchestrator -------------------------------------------------
+session:
+  orchestrator:
+    module: loop-agent
+    source: ../modules/loop-agent
+    config:
+      default_command_timeout_ms: 120000
+
+# --- Tools (Anthropic/Claude Code aligned defaults) --------------------------
+tools:
+  - module: tool-filesystem
+    source: git+https://github.com/microsoft/amplifier-module-tool-filesystem@main
+  - module: tool-bash
+    source: git+https://github.com/microsoft/amplifier-module-tool-bash@main
+    config:
+      timeout: 120
+  - module: tool-search
+    source: git+https://github.com/microsoft/amplifier-module-tool-search@main
+
+# --- System prompt -----------------------------------------------------------
+context:
+  include:
+    - context/system-anthropic.md

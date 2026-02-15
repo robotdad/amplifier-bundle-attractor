@@ -1,58 +1,117 @@
 # Attractor
 
-A multi-stage AI pipeline engine and non-interactive coding agent built on [Amplifier](https://github.com/microsoft/amplifier-core).
+Multi-stage AI pipelines for code. Plan, implement, test, review — orchestrated as
+directed graphs.
 
-Attractor implements the Attractor specification — a coding agent structured as a directed graph of phases, with support for conditional routing, parallel execution, human approval gates, and retry logic. It is designed for use in automated Software Factory workflows.
+## Quick Start (30 seconds)
 
-## Features
+1. Add Attractor to your Amplifier config:
+   ```yaml
+   includes:
+     - bundle: git+https://github.com/microsoft/amplifier-bundle-attractor@main#subdirectory=profiles/attractor-profile-anthropic
+   ```
 
-- **DOT graph pipelines** — Define multi-stage agent workflows as Graphviz DOT files
-- **Coding agent loop** — Single-turn agent orchestrator with steering, loop detection, and context management
-- **Parallel execution** — Fan-out to multiple nodes with configurable concurrency
-- **Conditional routing** — Branch pipeline execution based on prior stage outcomes
-- **Human approval gates** — Pause pipelines for human review before proceeding
-- **Retry with fallback** — Automatic retry with configurable fallback routing on failure
-- **Model stylesheets** — Override provider, model, and parameters per-node via CSS-like selectors
-- **Fidelity modes** — Control execution fidelity (full LLM calls, direct pass-through, etc.)
-- **Checkpointing** — Resume interrupted pipelines from the last completed stage
-- **Multi-provider support** — Ready-made profiles for Anthropic, OpenAI, and Gemini
+2. Ask the agent to run a pipeline:
+   > "Run the plan-implement-test pipeline to add input validation to the login endpoint"
 
-## Quick Start
+3. Or run directly from the CLI:
+   ```bash
+   amp run --agent attractor-anthropic --goal "Add input validation" \
+       --dot-file examples/pipelines/02-plan-implement-test.dot
+   ```
 
-Use a provider-specific profile for a complete configuration:
+4. Or generate a pipeline on-the-fly:
+   > "Build a test suite for the auth module using a parallel pipeline"
 
-```yaml
-# In your bundle.md or amplifier config:
-includes:
-  - bundle: git+https://github.com/microsoft/amplifier-bundle-attractor@main#subdirectory=profiles/attractor-profile-anthropic
+## What Can It Do?
+
+**Fix a bug systematically** — Reproduce, diagnose, fix, regression test, verify:
 ```
+amp run --dot-file examples/pipelines/practical/bug-fix.dot \
+    --goal "Fix the NullPointerError in UserService.getProfile()"
+```
+
+**Review a PR in parallel** — Analyze diff, then simultaneously check for bugs, security,
+performance, and style — then prioritize and generate review comments:
+```
+amp run --dot-file examples/pipelines/practical/pr-review.dot \
+    --goal "Review PR #142"
+```
+
+**Build a feature safely** — Parse spec, parallel implement (core, API, tests),
+integration test, human review gate:
+```
+amp run --dot-file examples/pipelines/practical/feature-build.dot \
+    --goal "Add user avatar upload with S3 storage"
+```
+
+## Pipeline Gallery
+
+| Pipeline | Pattern | Use Case |
+|----------|---------|----------|
+| [Simple Linear](examples/pipelines/01-simple-linear.dot) | `A -> B -> C` | Quick single-task |
+| [Plan-Implement-Test](examples/pipelines/02-plan-implement-test.dot) | `plan -> impl -> test` | Standard dev workflow |
+| [Conditional Routing](examples/pipelines/03-conditional-routing.dot) | `if/else` branches | Outcome-based flow |
+| [Retry with Fallback](examples/pipelines/04-retry-with-fallback.dot) | Retry loop | Resilient execution |
+| [Parallel Fan-Out](examples/pipelines/05-parallel-fan-out.dot) | Fork/join | Concurrent work |
+| [Model Stylesheet](examples/pipelines/06-model-stylesheet.dot) | CSS-like config | Multi-provider |
+| [Fidelity Modes](examples/pipelines/07-fidelity-modes.dot) | Context control | Execution fidelity |
+| [Human Gate](examples/pipelines/08-human-gate.dot) | Approval gate | Human-in-the-loop |
+| [Manager-Supervisor](examples/pipelines/09-manager-supervisor.dot) | Hierarchical | Agent supervision |
+| [Full Attractor](examples/pipelines/10-full-attractor.dot) | All features | Complete pipeline |
+| [PR Review](examples/pipelines/practical/pr-review.dot) | Parallel analysis | Code review |
+| [Test Generation](examples/pipelines/practical/test-gen.dot) | Retry loop | Test authoring |
+| [Bug Fix](examples/pipelines/practical/bug-fix.dot) | Diagnose + verify | Debugging |
+| [Feature Build](examples/pipelines/practical/feature-build.dot) | Parallel + gate | Feature development |
+| [Refactoring](examples/pipelines/practical/refactor.dot) | Snapshot safety | Code improvement |
+
+## How It Works
+
+The **loop-pipeline** orchestrator walks a Graphviz DOT digraph. Each node is an AI task
+(or control node like fork/join/gate), and edges define the flow between them. The
+orchestrator spawns a **loop-agent** session per node, which runs a mini agentic tool
+loop — call LLM, execute tools, feed results back — until the node completes.
+
+## Customization
+
+- **Model stylesheets** — Override provider, model, and reasoning effort per-node via CSS-like selectors
+- **Fidelity modes** — Control context carryover between nodes (full, compact, summary)
+- **Human gates** — Pause pipelines for human approval at any stage
+- **`$param` expansion** — Pass key-value parameters to pipelines for template reuse:
+  ```json
+  {
+    "goal": "Build a REST API",
+    "dot_file": "template.dot",
+    "params": {"language": "Python", "framework": "FastAPI"}
+  }
+  ```
+
+## DOT Syntax
+
+See [docs/DOT-SYNTAX.md](docs/DOT-SYNTAX.md) for the complete reference.
+
+Quick version — pipelines are Graphviz DOT digraphs where node shapes determine behavior:
+
+| Shape | What it does |
+|-------|-------------|
+| `Mdiamond` | Start node (entry point) |
+| `Msquare` | Exit node (pipeline end) |
+| `box` | LLM agent node (default) |
+| `component` | Parallel fan-out |
+| `tripleoctagon` | Parallel fan-in (collect results) |
+| `house` | Human approval gate |
+| `diamond` | Decision/routing node |
 
 ## Available Profiles
 
-| Profile | Provider | Edit Style | Shell Timeout |
-|---------|----------|-----------|---------------|
-| `attractor-profile-openai` | OpenAI | `apply_patch` (codex-rs aligned) | 10s |
-| `attractor-profile-anthropic` | Anthropic | `edit_file` (Claude Code aligned) | 120s |
-| `attractor-profile-gemini` | Gemini | `edit_file` (gemini-cli aligned) | 10s |
+| Profile | Provider | Best For |
+|---------|----------|----------|
+| `attractor-profile-anthropic` | Anthropic Claude | Tool-heavy coding tasks |
+| `attractor-profile-openai` | OpenAI | Reasoning-heavy analysis |
+| `attractor-profile-gemini` | Gemini | Large context tasks |
 
-## Example Pipelines
-
-The [`examples/pipelines/`](examples/pipelines/) directory contains 10 example pipelines demonstrating each capability:
-
-| # | Example | Description |
-|---|---------|-------------|
-| 01 | [Simple Linear](examples/pipelines/01-simple-linear.md) | Basic sequential pipeline |
-| 02 | [Plan-Implement-Test](examples/pipelines/02-plan-implement-test.md) | Three-phase development workflow |
-| 03 | [Conditional Routing](examples/pipelines/03-conditional-routing.md) | Branch execution based on outcomes |
-| 04 | [Retry with Fallback](examples/pipelines/04-retry-with-fallback.md) | Automatic retry and fallback paths |
-| 05 | [Parallel Fan-Out](examples/pipelines/05-parallel-fan-out.md) | Concurrent node execution |
-| 06 | [Model Stylesheet](examples/pipelines/06-model-stylesheet.md) | Per-node model and parameter overrides |
-| 07 | [Fidelity Modes](examples/pipelines/07-fidelity-modes.md) | Execution fidelity control |
-| 08 | [Human Gate](examples/pipelines/08-human-gate.md) | Human-in-the-loop approval gates |
-| 09 | [Manager-Supervisor](examples/pipelines/09-manager-supervisor.md) | Hierarchical agent supervision |
-| 10 | [Full Attractor](examples/pipelines/10-full-attractor.md) | Complete pipeline combining all features |
-
-## Architecture
+<details>
+<summary>Architecture</summary>
 
 ### Layers
 
@@ -75,19 +134,17 @@ amplifier-bundle-attractor/
 │   ├── system-openai.md
 │   ├── system-anthropic.md
 │   └── system-gemini.md
-├── specs/                       # Attractor specification documents
-│   ├── attractor-spec.md
-│   ├── coding-agent-loop-spec.md
-│   └── unified-llm-spec.md
-├── examples/pipelines/          # 10 example DOT pipelines
+├── examples/pipelines/          # 10 example + 5 practical DOT pipelines
 ├── modules/                     # Amplifier modules
 │   ├── loop-agent/              # Agent loop orchestrator
 │   ├── loop-pipeline/           # DOT graph-driven pipeline orchestrator
 │   ├── tool-apply-patch/        # v4a unified diff tool (OpenAI only)
 │   ├── tool-report-outcome/     # Structured outcome reporting tool
+│   ├── tool-pipeline-run/       # Runtime pipeline invocation tool
 │   ├── hooks-tool-truncation/   # Tool output truncation hook
 │   └── hooks-pipeline-progress/ # Pipeline progress reporting hook
-└── docs/plans/                  # Implementation planning docs
+└── docs/                        # Documentation
+    └── DOT-SYNTAX.md            # DOT syntax cheat sheet
 ```
 
 ### Module Responsibilities
@@ -98,12 +155,13 @@ amplifier-bundle-attractor/
 | `loop-pipeline` | orchestrator | Multi-stage DOT graph-driven pipeline with checkpointing and retry |
 | `tool-apply-patch` | tool | v4a unified diff patch application (OpenAI/codex-rs style) |
 | `tool-report-outcome` | tool | Structured result reporting for pipeline integration |
+| `tool-pipeline-run` | tool | Runtime pipeline invocation via session.spawn |
 | `hooks-tool-truncation` | hook | Truncates large tool outputs to manage context window |
 | `hooks-pipeline-progress` | hook | Reports pipeline stage progress |
 
-## Development
+</details>
 
-### Running Tests
+## Development
 
 Each module is independently testable:
 
@@ -112,10 +170,9 @@ cd modules/loop-agent && uv run pytest tests/ -q
 cd modules/loop-pipeline && uv run pytest tests/ -q
 cd modules/tool-apply-patch && uv run pytest tests/ -q
 cd modules/tool-report-outcome && uv run pytest tests/ -q
+cd modules/tool-pipeline-run && uv run pytest tests/ -q
 cd modules/hooks-tool-truncation && uv run pytest tests/ -q
 ```
-
-### Local Development
 
 The `pyproject.toml` in each module points to `amplifier-core` via relative path for local development:
 

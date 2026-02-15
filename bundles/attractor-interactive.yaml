@@ -62,6 +62,7 @@ context:
   include:
     - context/system-anthropic.md
     - context/pipeline-awareness.md
+    - context/dot-reference.md
 
 # The pipeline runner agent (spawned by tool-pipeline-run).
 # Inlined here because `bundle:` agent references are not resolved by the

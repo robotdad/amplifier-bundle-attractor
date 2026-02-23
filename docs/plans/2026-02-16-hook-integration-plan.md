@@ -14,7 +14,7 @@
 
 All work happens in the **loop-pipeline module** repo:
 ```
-/home/bkrabach/dev/attractor-next/amplifier-module-loop-pipeline/
+modules/loop-pipeline/
 ```
 
 **Test patterns** (match existing codebase):
@@ -145,7 +145,7 @@ def test_provider_event_constants_exist():
 **Step 2: Run test to verify it fails**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-module-loop-pipeline
+cd modules/loop-pipeline
 python -m pytest tests/test_provider_hooks.py::test_provider_event_constants_exist -v
 ```
 Expected: FAIL — `ImportError: cannot import name 'PROVIDER_REQUEST'`
@@ -1223,7 +1223,7 @@ git commit -m "test: backward compatibility and event ordering for provider hook
 **Step 1: Run all loop-pipeline tests**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-module-loop-pipeline
+cd modules/loop-pipeline
 python -m pytest tests/ -v --tb=short
 ```
 Expected: All tests PASS, including all existing tests and the new `test_provider_hooks.py`
@@ -1231,7 +1231,7 @@ Expected: All tests PASS, including all existing tests and the new `test_provide
 **Step 2: Run unified-llm-client tests to ensure no breakage**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/unified-llm-client
+cd ../unified-llm-client
 python -m pytest tests/unit/ tests/adapter/ tests/dod/ -v --tb=short -x
 ```
 Expected: All PASS
@@ -1239,7 +1239,7 @@ Expected: All PASS
 **Step 3: Commit Phase 1 completion marker**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-module-loop-pipeline
+cd modules/loop-pipeline
 git log --oneline -8
 ```
 Verify 7 clean commits from Tasks 1-9.
@@ -1333,7 +1333,7 @@ def test_create_hook_bridge_returns_callable():
 **Step 2: Run test to verify it fails**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-module-loop-pipeline
+cd modules/loop-pipeline
 python -m pytest tests/test_hook_bridge.py::test_create_hook_bridge_returns_callable -v
 ```
 Expected: FAIL — `ModuleNotFoundError: No module named 'amplifier_module_loop_pipeline.hook_bridge'`
@@ -2560,7 +2560,7 @@ git commit -m "test: end-to-end integration tests for hook bridge middleware"
 **Step 1: Run all loop-pipeline tests**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-module-loop-pipeline
+cd modules/loop-pipeline
 python -m pytest tests/ -v --tb=short
 ```
 Expected: All tests PASS
@@ -2568,7 +2568,7 @@ Expected: All tests PASS
 **Step 2: Run unified-llm-client tests**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/unified-llm-client
+cd ../unified-llm-client
 python -m pytest tests/unit/ tests/adapter/ tests/dod/ -v --tb=short -x
 ```
 Expected: All PASS
@@ -2576,7 +2576,7 @@ Expected: All PASS
 **Step 3: Verify commit history**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-module-loop-pipeline
+cd modules/loop-pipeline
 git log --oneline -15
 ```
 Verify ~13 clean TDD commits from Tasks 1-20.

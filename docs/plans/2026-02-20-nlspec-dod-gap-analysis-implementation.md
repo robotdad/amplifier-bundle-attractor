@@ -2,7 +2,7 @@
 
 **Date:** 2026-02-20
 **Audience:** Junior engineer with zero context (friendly and explicit)
-**Design doc:** `/home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/docs/plans/2026-02-20-nlspec-dod-gap-analysis-design.md`
+**Design doc:** `docs/plans/2026-02-20-nlspec-dod-gap-analysis-design.md`
 
 ---
 
@@ -34,34 +34,34 @@ Produce a **fresh, evidence-driven, per-DoD checklist** gap analysis report for 
 
 ## Codebase Patterns to Follow
 - Follow the existing markdown style in:
-  - `/home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/docs/reports/spec-gap-analysis-v2.md`
-  - `/home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/docs/reports/adversarial-spec-review.md`
+  - `docs/reports/spec-gap-analysis-v2.md`
+  - `docs/reports/adversarial-spec-review.md`
 - Use **file-path + line-range** evidence citations (example: `modules/loop-agent/agent.py:120-178`).
 - Use a **DoD checklist table** with columns:
   - `| DoD Item | Status | Evidence | Notes |` (add **Interpretation** column only if needed).
 
 ## Key Files and Directories
 ### Specs (source of truth)
-- `/home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/specs/attractor-spec.md`
-- `/home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/specs/coding-agent-loop-spec.md`
-- `/home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/specs/unified-llm-spec.md`
+- `specs/attractor-spec.md`
+- `specs/coding-agent-loop-spec.md`
+- `specs/unified-llm-spec.md`
 - Canonical versions (for cross-checking wording):
-  - `/home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/specs/canonical/attractor-spec-canonical.md`
-  - `/home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/specs/canonical/coding-agent-loop-spec-canonical.md`
-  - `/home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/specs/canonical/unified-llm-spec-canonical.md`
+  - `specs/canonical/attractor-spec-canonical.md`
+  - `specs/canonical/coding-agent-loop-spec-canonical.md`
+  - `specs/canonical/unified-llm-spec-canonical.md`
 
 ### Output Report (new)
-- `/home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/docs/reports/2026-02-20-nlspec-dod-gap-analysis.md`
+- `docs/reports/2026-02-20-nlspec-dod-gap-analysis.md`
 
 ### Evidence Repos (allowed)
-- `/home/bkrabach/dev/attractor-next/amplifier-bundle-attractor`
-- `/home/bkrabach/dev/attractor-next/unified-llm-client`
-- `/home/bkrabach/dev/attractor-next/amplifier-module-loop-agent`
-- `/home/bkrabach/dev/attractor-next/amplifier-module-loop-pipeline`
+- `amplifier-bundle-attractor`
+- `../unified-llm-client`
+- `modules/loop-agent`
+- `modules/loop-pipeline`
 
 ### Prior Reports (reference for formatting)
-- `/home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/docs/reports/spec-gap-analysis-v2.md`
-- `/home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/docs/reports/adversarial-spec-review.md`
+- `docs/reports/spec-gap-analysis-v2.md`
+- `docs/reports/adversarial-spec-review.md`
 
 ---
 
@@ -113,10 +113,10 @@ Produce a **fresh, evidence-driven, per-DoD checklist** gap analysis report for 
 
 **Commands:**
 ```bash
-ls /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/specs
-sed -n '1,200p' /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/specs/attractor-spec.md
-sed -n '1,200p' /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/specs/coding-agent-loop-spec.md
-sed -n '1,200p' /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/specs/unified-llm-spec.md
+ls specs
+sed -n '1,200p' specs/attractor-spec.md
+sed -n '1,200p' specs/coding-agent-loop-spec.md
+sed -n '1,200p' specs/unified-llm-spec.md
 ```
 
 **Expected Output:**
@@ -139,11 +139,11 @@ sed -n '1,200p' /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/spe
 
 **Commands:**
 ```bash
-ls /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/modules
-ls /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/tests
-ls /home/bkrabach/dev/attractor-next/unified-llm-client/tests
-ls /home/bkrabach/dev/attractor-next/amplifier-module-loop-agent/tests
-ls /home/bkrabach/dev/attractor-next/amplifier-module-loop-pipeline/tests
+ls modules
+ls tests
+ls ../unified-llm-client/tests
+ls modules/loop-agent/tests
+ls modules/loop-pipeline/tests
 ```
 
 **Expected Output:**
@@ -171,8 +171,8 @@ ls /home/bkrabach/dev/attractor-next/amplifier-module-loop-pipeline/tests
 **Commands:**
 ```bash
 # Example: open files to capture exact line ranges
-sed -n '1,200p' /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/modules/loop-agent/agent.py
-sed -n '1,200p' /home/bkrabach/dev/attractor-next/unified-llm-client/tests/dod/test_*.py
+sed -n '1,200p' modules/loop-agent/agent.py
+sed -n '1,200p' ../unified-llm-client/tests/dod/test_*.py
 ```
 
 **Expected Output:**
@@ -196,7 +196,7 @@ sed -n '1,200p' /home/bkrabach/dev/attractor-next/unified-llm-client/tests/dod/t
 
 **Commands:**
 ```bash
-cat <<'EOF' > /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/docs/reports/2026-02-20-nlspec-dod-gap-analysis.md
+cat <<'EOF' > docs/reports/2026-02-20-nlspec-dod-gap-analysis.md
 # NLSpec DoD Gap Analysis — Attractor (attractor-next)
 
 **Date:** 2026-02-20
@@ -248,7 +248,7 @@ EOF
 
 **Commands:**
 ```bash
-sed -n '1,200p' /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/docs/reports/2026-02-20-nlspec-dod-gap-analysis.md
+sed -n '1,200p' docs/reports/2026-02-20-nlspec-dod-gap-analysis.md
 ```
 
 **Expected Output:**
@@ -271,7 +271,7 @@ sed -n '1,200p' /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/doc
 ```bash
 git status --short
 
-git add /home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/docs/reports/2026-02-20-nlspec-dod-gap-analysis.md
+git add docs/reports/2026-02-20-nlspec-dod-gap-analysis.md
 
 git commit -m "docs: add NLSpec DoD gap analysis report"
 ```
@@ -283,7 +283,7 @@ git commit -m "docs: add NLSpec DoD gap analysis report"
 
 ## Success Criteria
 - A complete, per-DoD checklist report exists at:
-  - `/home/bkrabach/dev/attractor-next/amplifier-bundle-attractor/docs/reports/2026-02-20-nlspec-dod-gap-analysis.md`
+  - `docs/reports/2026-02-20-nlspec-dod-gap-analysis.md`
 - Every DoD item includes **Status + Evidence/Notes**.
 - Evidence is limited to the allowed repos, with out-of-scope flagged.
 - Formatting matches the existing report style.

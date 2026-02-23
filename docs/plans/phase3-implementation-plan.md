@@ -9,7 +9,7 @@
 **Tech Stack:** Python 3.12+, pytest, asyncio, dataclasses, amplifier-core
 
 **Repos:**
-- `amplifier-core` at `/home/bkrabach/dev/attractor-next/amplifier-core`
+- `amplifier-core` at `../amplifier-core`
 
 **Design doc:** `amplifier-bundle-attractor/docs/plans/phase3-upstream-design.md`
 
@@ -333,14 +333,14 @@ class TestNewErrorsImportFromCore:
 
 **Step 3: Run tests to verify they fail**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-core && uv run pytest tests/test_llm_errors.py -v --tb=short`
+Run: `cd ../amplifier-core && uv run pytest tests/test_llm_errors.py -v --tb=short`
 
 Expected: FAIL — `ImportError: cannot import name 'AbortError' from 'amplifier_core.llm_errors'`
 
 **Step 4: Commit failing tests**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-core
+cd ../amplifier-core
 git add tests/test_llm_errors.py
 git commit -m "test: add failing tests for 8 new error types"
 ```
@@ -527,14 +527,14 @@ class QuotaExceededError(RateLimitError):
 
 **Step 2: Run the tests**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-core && uv run pytest tests/test_llm_errors.py -v --tb=short`
+Run: `cd ../amplifier-core && uv run pytest tests/test_llm_errors.py -v --tb=short`
 
 Expected: Most new tests PASS. The `TestNewErrorsImportFromCore` tests still FAIL because `__init__.py` doesn't export them yet.
 
 **Step 3: Commit**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-core
+cd ../amplifier-core
 git add amplifier_core/llm_errors.py
 git commit -m "feat: add 8 new LLMError subclasses (Phase 3 error hierarchy)"
 ```
@@ -628,14 +628,14 @@ Replace it with:
 
 **Step 3: Run tests**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-core && uv run pytest tests/test_llm_errors.py -v --tb=short`
+Run: `cd ../amplifier-core && uv run pytest tests/test_llm_errors.py -v --tb=short`
 
 Expected: ALL PASS (including `TestNewErrorsImportFromCore`)
 
 **Step 4: Commit**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-core
+cd ../amplifier-core
 git add amplifier_core/__init__.py
 git commit -m "feat: export 8 new error types from amplifier_core public API"
 ```
@@ -675,7 +675,7 @@ class TestProviderRetryEvent:
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-core && uv run pytest tests/test_events_provider_retry.py -v --tb=short`
+Run: `cd ../amplifier-core && uv run pytest tests/test_events_provider_retry.py -v --tb=short`
 
 Expected: FAIL — `ImportError: cannot import name 'PROVIDER_RETRY'`
 
@@ -706,14 +706,14 @@ Then add `PROVIDER_RETRY` to the `ALL_EVENTS` list. Insert it after the `PROVIDE
 
 **Step 4: Run test to verify it passes**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-core && uv run pytest tests/test_events_provider_retry.py -v --tb=short`
+Run: `cd ../amplifier-core && uv run pytest tests/test_events_provider_retry.py -v --tb=short`
 
 Expected: PASS
 
 **Step 5: Commit**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-core
+cd ../amplifier-core
 git add amplifier_core/events.py tests/test_events_provider_retry.py
 git commit -m "feat: add PROVIDER_RETRY event constant"
 ```
@@ -729,13 +729,13 @@ git commit -m "feat: add PROVIDER_RETRY event constant"
 
 **Step 1: Run full amplifier-core test suite**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-core && uv run pytest tests/ -v --tb=short`
+Run: `cd ../amplifier-core && uv run pytest tests/ -v --tb=short`
 
 Expected: ALL PASS. Zero existing tests should break — all changes are purely additive.
 
 **Step 2: Run python quality checks**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-core && uv run ruff check amplifier_core/ && uv run ruff format --check amplifier_core/`
+Run: `cd ../amplifier-core && uv run ruff check amplifier_core/ && uv run ruff format --check amplifier_core/`
 
 Expected: Clean (no lint errors, no formatting issues).
 
@@ -824,14 +824,14 @@ class TestRetryConfig:
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-core && uv run pytest tests/test_retry.py::TestRetryConfig -v --tb=short`
+Run: `cd ../amplifier-core && uv run pytest tests/test_retry.py::TestRetryConfig -v --tb=short`
 
 Expected: FAIL — `ModuleNotFoundError: No module named 'amplifier_core.utils.retry'`
 
 **Step 3: Commit**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-core
+cd ../amplifier-core
 git add tests/test_retry.py
 git commit -m "test: add failing tests for RetryConfig"
 ```
@@ -1026,14 +1026,14 @@ class TestRetryWithBackoff:
 
 **Step 2: Run tests to verify they fail**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-core && uv run pytest tests/test_retry.py::TestRetryWithBackoff -v --tb=short`
+Run: `cd ../amplifier-core && uv run pytest tests/test_retry.py::TestRetryWithBackoff -v --tb=short`
 
 Expected: FAIL — `ModuleNotFoundError`
 
 **Step 3: Commit**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-core
+cd ../amplifier-core
 git add tests/test_retry.py
 git commit -m "test: add failing tests for retry_with_backoff()"
 ```
@@ -1109,14 +1109,14 @@ class TestClassifyErrorMessage:
 
 **Step 2: Run tests to verify they fail**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-core && uv run pytest tests/test_retry.py::TestClassifyErrorMessage -v --tb=short`
+Run: `cd ../amplifier-core && uv run pytest tests/test_retry.py::TestClassifyErrorMessage -v --tb=short`
 
 Expected: FAIL — `ModuleNotFoundError`
 
 **Step 3: Commit**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-core
+cd ../amplifier-core
 git add tests/test_retry.py
 git commit -m "test: add failing tests for classify_error_message()"
 ```
@@ -1265,14 +1265,14 @@ def classify_error_message(
 
 **Step 2: Run `RetryConfig` and `classify_error_message` tests**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-core && uv run pytest tests/test_retry.py::TestRetryConfig tests/test_retry.py::TestClassifyErrorMessage -v --tb=short`
+Run: `cd ../amplifier-core && uv run pytest tests/test_retry.py::TestRetryConfig tests/test_retry.py::TestClassifyErrorMessage -v --tb=short`
 
 Expected: ALL PASS
 
 **Step 3: Commit**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-core
+cd ../amplifier-core
 git add amplifier_core/utils/retry.py
 git commit -m "feat: add RetryConfig and classify_error_message()"
 ```
@@ -1367,14 +1367,14 @@ async def retry_with_backoff(
 
 **Step 2: Run all retry tests**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-core && uv run pytest tests/test_retry.py -v --tb=short`
+Run: `cd ../amplifier-core && uv run pytest tests/test_retry.py -v --tb=short`
 
 Expected: ALL PASS
 
 **Step 3: Commit**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-core
+cd ../amplifier-core
 git add amplifier_core/utils/retry.py
 git commit -m "feat: add retry_with_backoff() async retry utility"
 ```
@@ -1482,14 +1482,14 @@ class TestRetryExports:
 
 **Step 4: Run export tests**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-core && uv run pytest tests/test_retry_exports.py -v --tb=short`
+Run: `cd ../amplifier-core && uv run pytest tests/test_retry_exports.py -v --tb=short`
 
 Expected: ALL PASS
 
 **Step 5: Commit**
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/amplifier-core
+cd ../amplifier-core
 git add amplifier_core/utils/__init__.py amplifier_core/__init__.py tests/test_retry_exports.py
 git commit -m "feat: export retry utilities from amplifier_core public API"
 ```
@@ -1505,13 +1505,13 @@ git commit -m "feat: export retry utilities from amplifier_core public API"
 
 **Step 1: Run full test suite**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-core && uv run pytest tests/ -v --tb=short`
+Run: `cd ../amplifier-core && uv run pytest tests/ -v --tb=short`
 
 Expected: ALL PASS. Zero existing tests should break.
 
 **Step 2: Run quality checks**
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-core && uv run ruff check amplifier_core/ tests/ && uv run ruff format --check amplifier_core/ tests/`
+Run: `cd ../amplifier-core && uv run ruff check amplifier_core/ tests/ && uv run ruff format --check amplifier_core/ tests/`
 
 Expected: Clean.
 
@@ -1519,7 +1519,7 @@ Expected: Clean.
 
 The `retry_with_backoff` tests use `@pytest.mark.asyncio`. If the test runner complains, check `pyproject.toml` for `pytest-asyncio` in dev dependencies. If missing:
 
-Run: `cd /home/bkrabach/dev/attractor-next/amplifier-core && uv add --dev pytest-asyncio`
+Run: `cd ../amplifier-core && uv add --dev pytest-asyncio`
 
 Then re-run tests.
 

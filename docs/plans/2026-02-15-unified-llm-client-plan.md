@@ -92,13 +92,13 @@ Phase 9: Public API + Polish
 ### Task 1: Project Scaffolding
 
 **Files:**
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/pyproject.toml`
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/unified_llm/__init__.py`
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/unified_llm/py.typed`
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/tests/__init__.py`
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/tests/unit/__init__.py`
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/tests/adapter/__init__.py`
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/tests/dod/__init__.py`
+- Create: `../unified-llm-client/pyproject.toml`
+- Create: `../unified-llm-client/unified_llm/__init__.py`
+- Create: `../unified-llm-client/unified_llm/py.typed`
+- Create: `../unified-llm-client/tests/__init__.py`
+- Create: `../unified-llm-client/tests/unit/__init__.py`
+- Create: `../unified-llm-client/tests/adapter/__init__.py`
+- Create: `../unified-llm-client/tests/dod/__init__.py`
 
 **Depends on:** Nothing
 **Effort:** ~3 min
@@ -163,7 +163,7 @@ dev = [
 #### Step 3: Verify project scaffolding
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/unified-llm-client
+cd ../unified-llm-client
 uv sync
 uv run pytest --co -q
 ```
@@ -181,8 +181,8 @@ git add -A && git commit -m "feat: scaffold unified-llm-client project"
 ### Task 2: Role and ContentKind Enums
 
 **Files:**
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/unified_llm/types.py`
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/tests/unit/test_types.py`
+- Create: `../unified-llm-client/unified_llm/types.py`
+- Create: `../unified-llm-client/tests/unit/test_types.py`
 
 **Depends on:** Task 1
 **Effort:** ~3 min
@@ -235,7 +235,7 @@ class TestContentKind:
 #### Step 2: Run test — verify it fails
 
 ```bash
-cd /home/bkrabach/dev/attractor-next/unified-llm-client
+cd ../unified-llm-client
 uv run pytest tests/unit/test_types.py -v
 ```
 
@@ -1984,8 +1984,8 @@ git add -A && git commit -m "feat: add TimeoutConfig, AdapterTimeout, ModelInfo 
 ### Task 14: Error Hierarchy
 
 **Files:**
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/unified_llm/errors.py`
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/tests/unit/test_errors.py`
+- Create: `../unified-llm-client/unified_llm/errors.py`
+- Create: `../unified-llm-client/tests/unit/test_errors.py`
 
 **Depends on:** Task 1
 **Effort:** ~5 min
@@ -2415,8 +2415,8 @@ git add -A && git commit -m "feat: add full 13-type error hierarchy with status 
 ### Task 15: Retry System
 
 **Files:**
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/unified_llm/retry.py`
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/tests/unit/test_retry.py`
+- Create: `../unified-llm-client/unified_llm/retry.py`
+- Create: `../unified-llm-client/tests/unit/test_retry.py`
 
 **Depends on:** Task 14, 13
 **Effort:** ~5 min
@@ -2675,8 +2675,8 @@ git add -A && git commit -m "feat: add retry system with exponential backoff, ji
 ### Task 16: Middleware Chain
 
 **Files:**
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/unified_llm/middleware.py`
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/tests/unit/test_middleware.py`
+- Create: `../unified-llm-client/unified_llm/middleware.py`
+- Create: `../unified-llm-client/tests/unit/test_middleware.py`
 
 **Depends on:** Task 8, 9
 **Effort:** ~5 min
@@ -2916,9 +2916,9 @@ git add -A && git commit -m "feat: add middleware chain (onion pattern, blocking
 ### Task 17: Model Catalog
 
 **Files:**
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/unified_llm/catalog.py`
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/unified_llm/data/models.json`
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/tests/unit/test_catalog.py`
+- Create: `../unified-llm-client/unified_llm/catalog.py`
+- Create: `../unified-llm-client/unified_llm/data/models.json`
+- Create: `../unified-llm-client/tests/unit/test_catalog.py`
 
 **Depends on:** Task 13
 **Effort:** ~5 min
@@ -3215,7 +3215,7 @@ git add -A && git commit -m "feat: add model catalog with JSON data and lookup f
 ### Task 18: ProviderAdapter Interface
 
 **Files:**
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/unified_llm/adapters/__init__.py`
+- Create: `../unified-llm-client/unified_llm/adapters/__init__.py`
 
 **Depends on:** Task 8, 9, 11
 **Effort:** ~2 min
@@ -3281,8 +3281,8 @@ git add -A && git commit -m "feat: add ProviderAdapter protocol interface"
 ### Task 19: Client Class with Provider Routing
 
 **Files:**
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/unified_llm/client.py`
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/tests/unit/test_client.py`
+- Create: `../unified-llm-client/unified_llm/client.py`
+- Create: `../unified-llm-client/tests/unit/test_client.py`
 
 **Depends on:** Task 18, 14
 **Effort:** ~5 min
@@ -3608,8 +3608,8 @@ These are already implemented in Task 19's Client class. The `from_env()` constr
 ### Task 22-27: Anthropic Adapter (Phase 4)
 
 **Files:**
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/unified_llm/adapters/anthropic.py`
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/tests/adapter/test_anthropic.py`
+- Create: `../unified-llm-client/unified_llm/adapters/anthropic.py`
+- Create: `../unified-llm-client/tests/adapter/test_anthropic.py`
 
 **Depends on:** Task 18, 14
 **Effort:** ~25 min total (5 sub-tasks)
@@ -3678,8 +3678,8 @@ git add -A && git commit -m "feat(anthropic): <sub-task description>"
 ### Task 28-33: OpenAI Adapter (Phase 5)
 
 **Files:**
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/unified_llm/adapters/openai.py`
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/tests/adapter/test_openai.py`
+- Create: `../unified-llm-client/unified_llm/adapters/openai.py`
+- Create: `../unified-llm-client/tests/adapter/test_openai.py`
 
 **Depends on:** Task 18, 14
 **Effort:** ~25 min total
@@ -3729,8 +3729,8 @@ Write test: Verify `reasoning_tokens` populated from Responses API, `reasoning_e
 ### Task 34-38: Gemini Adapter (Phase 6)
 
 **Files:**
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/unified_llm/adapters/gemini.py`
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/tests/adapter/test_gemini.py`
+- Create: `../unified-llm-client/unified_llm/adapters/gemini.py`
+- Create: `../unified-llm-client/tests/adapter/test_gemini.py`
 
 **Depends on:** Task 18, 14
 **Effort:** ~25 min total
@@ -3784,8 +3784,8 @@ Write test: Gemini SSE/JSON chunks → unified StreamEvent:
 ### Task 39: generate() — Basic
 
 **Files:**
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/unified_llm/generate.py`
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/tests/unit/test_generate.py`
+- Create: `../unified-llm-client/unified_llm/generate.py`
+- Create: `../unified-llm-client/tests/unit/test_generate.py`
 
 **Depends on:** Task 19, 15
 **Effort:** ~5 min
@@ -4221,8 +4221,8 @@ Add abort signal and timeout support to `generate()` and `stream()`:
 ### Task 46: OpenAI-Compatible Adapter
 
 **Files:**
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/unified_llm/adapters/openai_compat.py`
-- Create: `/home/bkrabach/dev/attractor-next/unified-llm-client/tests/adapter/test_openai_compat.py`
+- Create: `../unified-llm-client/unified_llm/adapters/openai_compat.py`
+- Create: `../unified-llm-client/tests/adapter/test_openai_compat.py`
 
 **Depends on:** Task 18, 30
 **Effort:** ~10 min
@@ -4241,7 +4241,7 @@ Implement `OpenAICompatAdapter` that uses Chat Completions API (`/v1/chat/comple
 ### Task 47: __init__.py Public Exports
 
 **Files:**
-- Modify: `/home/bkrabach/dev/attractor-next/unified-llm-client/unified_llm/__init__.py`
+- Modify: `../unified-llm-client/unified_llm/__init__.py`
 
 **Depends on:** All above
 **Effort:** ~2 min

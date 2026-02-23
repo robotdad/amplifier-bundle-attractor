@@ -21,7 +21,7 @@
 | Create | `tests/test_unified_provider_adapter.py` | Adapter unit tests |
 | Modify | `amplifier_module_loop_agent/__init__.py` | Injection in `AgentOrchestrator.execute()` |
 
-**Working directory for all commands:** `/home/bkrabach/dev/attractor-next/amplifier-module-loop-agent`
+**Working directory for all commands:** `modules/loop-agent`
 
 **Test command (adapter only):** `uv run pytest tests/test_unified_provider_adapter.py -v`
 

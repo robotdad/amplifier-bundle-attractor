@@ -45,6 +45,21 @@ tools:
   - module: tool-search
     source: git+https://github.com/microsoft/amplifier-module-tool-search@main
 
+hooks:
+  - module: hooks-logging
+    config:
+      additional_events:
+        - "pipeline:start"
+        - "pipeline:complete"
+        - "pipeline:node_start"
+        - "pipeline:node_complete"
+        - "pipeline:edge_selected"
+        - "pipeline:checkpoint"
+        - "pipeline:goal_gate_check"
+        - "pipeline:error"
+        - "pipeline:stage_retrying"
+        - "pipeline:stage_failed"
+
 context:
   include:
     - context/system-anthropic.md

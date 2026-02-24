@@ -105,6 +105,49 @@ route nodes to providers.
 | `bundles/attractor-agent` | Standalone coding agent (no pipeline) |
 | `profiles/attractor-profile-*` | Single-provider agent profiles |
 
+## Running in Isolated Environments
+
+When running pipelines inside Docker containers or remote hosts (via
+`execution_environment` configuration), use the **isolated agent profiles**
+instead of the standard ones. These profiles replace host-local file, bash, and
+search tools with `env_*` tools that operate inside the isolated environment.
+
+### Available Isolated Profiles
+
+| Standard Profile | Isolated Variant |
+|-----------------|------------------|
+| `attractor-agent-anthropic` | `attractor-agent-anthropic-isolated` |
+| `attractor-agent-openai` | `attractor-agent-openai-isolated` |
+| `attractor-agent-gemini` | `attractor-agent-gemini-isolated` |
+
+### Configuration Example
+
+```yaml
+# .amplifier/config.yaml -- isolated execution
+includes:
+  - bundle: git+https://github.com/microsoft/amplifier-bundle-attractor@main#subdirectory=agents/attractor-agent-anthropic-isolated
+```
+
+Or when configuring profiles for a pipeline:
+
+```yaml
+profiles:
+  anthropic: attractor-agent-anthropic-isolated
+  openai: attractor-agent-openai-isolated
+  gemini: attractor-agent-gemini-isolated
+```
+
+### The Rule
+
+Include `env-all` (isolated tools) **or** standard file/bash/search tools,
+**never both**. Having both tool sets available creates ambiguity -- the LLM may
+use host-local tools instead of environment tools, breaking isolation.
+
+The `tool-report-outcome` and `hooks-tool-truncation` modules are
+environment-agnostic and safe to include alongside either set. The Gemini
+isolated profile also retains `tool-web` since it is not a file or execution
+tool.
+
 ## Common Gotchas
 
 ### Use `uv run pytest` for testing modules

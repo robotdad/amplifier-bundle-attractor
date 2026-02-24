@@ -1,0 +1,44 @@
+# Gemini coding agent -- isolated environment variant
+# Uses env_* tools (env_exec, env_read_file, env_write_file, env_edit_file,
+# env_grep, env_glob) instead of host-local file/bash/search tools.
+# Keeps tool-web for grounding (not a file/exec tool).
+# For use with execution_environment configurations (Docker, SSH).
+
+bundle:
+  name: attractor-agent-gemini-isolated
+  version: 0.1.0
+  description: >
+    Gemini coding agent for isolated environments.
+    Uses env_* tools instead of host-local file/bash/search.
+    Retains web tools for grounding.
+
+includes:
+  - bundle: attractor:behaviors/attractor-core
+  - bundle: git+https://github.com/bkrabach/amplifier-bundle-env-all@main#subdirectory=behaviors/env-all.yaml
+
+providers:
+  - module: provider-gemini
+    source: git+https://github.com/microsoft/amplifier-module-provider-gemini@main
+    config:
+      default_model: gemini-2.5-pro
+      timeout: 600
+
+session:
+  orchestrator:
+    module: loop-agent
+    source: git+https://github.com/microsoft/amplifier-bundle-attractor@main#subdirectory=modules/loop-agent
+    config:
+      max_tool_rounds_per_input: 50
+      default_command_timeout_ms: 120000
+  context:
+    module: context-simple
+    source: git+https://github.com/microsoft/amplifier-module-context-simple@main
+
+tools:
+  - module: tool-web
+    source: git+https://github.com/microsoft/amplifier-module-tool-web@main
+
+context:
+  include:
+    - context/system-gemini.md
+    - context/isolated-environment-guidance.md

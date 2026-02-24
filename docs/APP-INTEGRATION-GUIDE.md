@@ -368,6 +368,74 @@ The recipe handles:
 
 See `@recipes:examples/attractor/README.md` for full documentation.
 
+## Isolated Execution Environments
+
+When pipeline nodes should execute inside Docker containers or remote hosts
+rather than the local filesystem, use the **isolated agent profiles**. These
+replace host-local tools (`tool-filesystem`, `tool-bash`, `tool-search`,
+`tool-apply-patch`) with `env_*` tools from the `env-all` behavior bundle that
+route operations through the configured execution environment.
+
+### Using Isolated Profiles
+
+Reference the isolated agent profiles in your bundle configuration:
+
+```python
+ATTRACTOR_BUNDLE = (
+    "git+https://github.com/microsoft/amplifier-bundle-attractor@main"
+    "#subdirectory=agents/attractor-agent-anthropic-isolated"
+)
+```
+
+Or when composing at runtime:
+
+```python
+from amplifier_foundation import Bundle
+
+isolated_overlay = Bundle(
+    name="isolated-pipeline",
+    session={
+        "orchestrator": {
+            "module": "loop-pipeline",
+            "config": {
+                "dot_source": DOT,
+                "execution_environment": {
+                    "type": "docker",
+                    "image": "python:3.12-slim",
+                },
+            },
+        }
+    },
+)
+```
+
+### Available Isolated Profiles
+
+| Standard Profile | Isolated Variant | Notes |
+|-----------------|------------------|-------|
+| `attractor-agent-anthropic` | `attractor-agent-anthropic-isolated` | env_* tools only |
+| `attractor-agent-openai` | `attractor-agent-openai-isolated` | env_* replaces apply_patch too |
+| `attractor-agent-gemini` | `attractor-agent-gemini-isolated` | Retains tool-web for grounding |
+
+### Composition Rules
+
+When composing bundles for isolated execution, follow these rules:
+
+1. **Include `env-all` OR standard file/bash/search tools, never both.** Having
+   both tool sets creates ambiguity -- the LLM may use host-local tools instead
+   of environment tools, breaking isolation.
+
+2. **`tool-report-outcome` and `hooks-tool-truncation` are environment-agnostic**
+   and safe to include alongside either tool set. They are already included via
+   the `attractor-core` behavior.
+
+3. **`tool-web` is environment-agnostic** -- it makes HTTP requests, not
+   filesystem operations. The Gemini isolated profile retains it.
+
+4. **If building custom profiles**, start from the isolated variants and add
+   only environment-agnostic modules. Do not add `tool-filesystem`, `tool-bash`,
+   `tool-search`, or `tool-apply-patch` to an isolated profile.
+
 ## Known Limitations
 
 | Limitation | Impact | Workaround |

@@ -1,0 +1,38 @@
+# Anthropic coding agent -- isolated environment variant
+# Uses env_* tools (env_exec, env_read_file, env_write_file, env_edit_file,
+# env_grep, env_glob) instead of host-local file/bash/search tools.
+# For use with execution_environment configurations (Docker, SSH).
+
+bundle:
+  name: attractor-agent-anthropic-isolated
+  version: 0.1.0
+  description: >
+    Anthropic coding agent for isolated environments.
+    Uses env_* tools instead of host-local file/bash/search.
+
+includes:
+  - bundle: attractor:behaviors/attractor-core
+  - bundle: git+https://github.com/bkrabach/amplifier-bundle-env-all@main#subdirectory=behaviors/env-all.yaml
+
+providers:
+  - module: provider-anthropic
+    source: git+https://github.com/microsoft/amplifier-module-provider-anthropic@main
+    config:
+      default_model: claude-sonnet-4-20250514
+      timeout: 600
+
+session:
+  orchestrator:
+    module: loop-agent
+    source: git+https://github.com/microsoft/amplifier-bundle-attractor@main#subdirectory=modules/loop-agent
+    config:
+      max_tool_rounds_per_input: 50
+      default_command_timeout_ms: 120000
+  context:
+    module: context-simple
+    source: git+https://github.com/microsoft/amplifier-module-context-simple@main
+
+context:
+  include:
+    - context/system-anthropic.md
+    - context/isolated-environment-guidance.md

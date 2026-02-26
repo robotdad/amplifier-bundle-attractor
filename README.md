@@ -213,8 +213,14 @@ async def main():
 asyncio.run(main())
 ```
 
-Requirements: `pip install amplifier-module-loop-pipeline unified-llm-client` plus
-an API key in environment (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GEMINI_API_KEY`).
+Requirements: install `amplifier-module-loop-pipeline` from the bundle (this pulls in
+`unified-llm-client` automatically):
+
+```
+pip install "amplifier-module-loop-pipeline @ git+https://github.com/microsoft/amplifier-bundle-attractor@main#subdirectory=modules/loop-pipeline"
+```
+
+Plus an API key in environment (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GEMINI_API_KEY`).
 
 ### Option B: Full Amplifier session with tools
 
@@ -321,6 +327,7 @@ amplifier-bundle-attractor/
 │   ├── loop-agent/              # Agent loop orchestrator
 │   ├── loop-pipeline/           # DOT graph-driven pipeline orchestrator
 │   ├── tool-apply-patch/        # v4a unified diff tool (OpenAI only)
+│   ├── unified-llm-client/      # Multi-provider LLM client library
 │   ├── tool-report-outcome/     # Structured outcome reporting tool
 │   ├── tool-pipeline-run/       # Runtime pipeline invocation tool
 │   ├── hooks-tool-truncation/   # Tool output truncation hook
@@ -336,6 +343,7 @@ amplifier-bundle-attractor/
 | `loop-agent` | orchestrator | Single-turn coding agent loop with steering, loop detection, and context management |
 | `loop-pipeline` | orchestrator | Multi-stage DOT graph-driven pipeline with checkpointing, retry, and fidelity control |
 | `tool-apply-patch` | tool | v4a unified diff patch application (OpenAI/codex-rs style) |
+| `unified-llm-client` | library | Multi-provider LLM client with adapters for Anthropic, OpenAI, Gemini |
 | `tool-report-outcome` | tool | Structured result reporting for pipeline integration |
 | `tool-pipeline-run` | tool | Runtime pipeline invocation via session.spawn |
 | `hooks-tool-truncation` | hook | Truncates large tool outputs to manage context window |
@@ -380,7 +388,7 @@ done
   [tool.uv.sources]
   amplifier-core = { path = "../../../amplifier-core", editable = true }
   ```
-- `loop-pipeline` additionally depends on `unified-llm-client` (in the same workspace at `../../../unified-llm-client`).
+- `loop-pipeline` and `loop-agent` additionally depend on `unified-llm-client` (bundled at `modules/unified-llm-client/`, resolved via `[tool.uv.sources]` relative paths).
 - For programmatic usage with full sessions: `pip install amplifier-foundation`.
 
 ### E2E Tests

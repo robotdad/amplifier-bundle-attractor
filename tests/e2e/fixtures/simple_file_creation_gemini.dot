@@ -1,0 +1,9 @@
+digraph simple_gemini_test {
+    graph [goal="Create a hello world Python script"]
+    
+    start     [shape=Mdiamond]
+    implement [shape=box, prompt="Create a file called hello.py that prints 'Hello World'. Use only the tools available to you.", llm_provider="gemini", goal_gate=true]
+    done      [shape=Msquare]
+    
+    start -> implement -> done
+}

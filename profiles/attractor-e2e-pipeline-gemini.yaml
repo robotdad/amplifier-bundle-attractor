@@ -24,7 +24,7 @@ session:
     module: loop-pipeline
     source: git+https://github.com/microsoft/amplifier-bundle-attractor@main#subdirectory=modules/loop-pipeline
     config:
-      dot_file: ./tests/e2e/fixtures/simple_file_creation.dot
+      dot_file: ./tests/e2e/fixtures/simple_file_creation_gemini.dot
       profiles:
         gemini: attractor-gemini
   context:

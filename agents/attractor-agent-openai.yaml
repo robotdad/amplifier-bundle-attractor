@@ -1,5 +1,5 @@
 # OpenAI coding agent (codex-rs aligned)
-# Uses apply_patch for edits, restricted filesystem, 10s shell timeout.
+# Uses native apply_patch (Responses API built-in), restricted filesystem, 10s shell timeout.
 # Shared definition — referenced by attractor-pipeline, attractor-interactive,
 # and pipeline-runner bundles.
 
@@ -8,7 +8,7 @@ bundle:
   version: 0.1.0
   description: >
     OpenAI coding agent (codex-rs aligned).
-    Uses apply_patch for edits, restricted filesystem, 10s shell timeout.
+    Uses native apply_patch (Responses API built-in), restricted filesystem, 10s shell timeout.
 
 includes:
   - bundle: attractor:behaviors/attractor-core
@@ -33,7 +33,11 @@ session:
 
 tools:
   - module: tool-apply-patch
-    source: git+https://github.com/microsoft/amplifier-bundle-attractor@main#subdirectory=modules/tool-apply-patch
+    source: git+https://github.com/microsoft/amplifier-bundle-filesystem@main#subdirectory=modules/tool-apply-patch
+    config:
+      engine: native
+      allowed_write_paths: ["."]
+      denied_write_paths: []
   - module: tool-filesystem
     source: git+https://github.com/microsoft/amplifier-module-tool-filesystem@main
     config:

@@ -26,7 +26,7 @@ session:
     source: git+https://github.com/microsoft/amplifier-bundle-attractor@main#subdirectory=modules/loop-agent
     config:
       max_tool_rounds_per_input: 50
-      default_command_timeout_ms: 120000
+      default_command_timeout_ms: 10000
   context:
     module: context-simple
     source: git+https://github.com/microsoft/amplifier-module-context-simple@main
@@ -37,7 +37,7 @@ tools:
   - module: tool-bash
     source: git+https://github.com/microsoft/amplifier-module-tool-bash@main
     config:
-      timeout: 120
+      timeout: 10
   - module: tool-search
     source: git+https://github.com/microsoft/amplifier-module-tool-search@main
   - module: tool-web

@@ -141,4 +141,5 @@ async def main():
     print(f"\n  {'ALL PASSED' if all_passed else 'SOME FAILED'}")
     return 0 if all_passed else 1
 
-sys.exit(asyncio.run(main()))
+if __name__ == "__main__":
+    sys.exit(asyncio.run(main()))

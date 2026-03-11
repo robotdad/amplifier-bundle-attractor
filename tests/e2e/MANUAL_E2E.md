@@ -137,3 +137,122 @@ Pipeline graph: start -> implement -> test -> gate
 - **Tool call failures**: Ensure the working directory is writable
 - **Pipeline hangs**: Check that `dot_file` path resolves correctly relative to the profile
 - **Timeout**: Pipeline tests make multiple LLM calls; increase timeout or check network
+
+---
+
+## Gemini Agent Tests (G1-G4)
+
+Use profile: `profiles/attractor-e2e-gemini.yaml`
+
+### Prerequisites
+
+- `GOOGLE_API_KEY` set in environment
+- `amplifier` CLI installed and on PATH
+
+### Run all Gemini agent tests via pytest
+
+```bash
+GOOGLE_API_KEY=your-key uv run pytest tests/e2e/test_gemini_agent.py -v
+```
+
+### G1: Basic invocation
+
+```bash
+mkdir -p /tmp/e2e-g1 && cd /tmp/e2e-g1
+amplifier run -B "file://<BUNDLE_ROOT>/profiles/attractor-e2e-gemini.yaml" \
+  --mode single \
+  "Write a one-sentence explanation of what a Python list comprehension is. No file creation needed."
+```
+
+**Expected result:** Agent responds with a coherent explanation; exit code 0.
+
+### G2: Agent creates a file
+
+```bash
+mkdir -p /tmp/e2e-g2 && cd /tmp/e2e-g2
+amplifier run -B "file://<BUNDLE_ROOT>/profiles/attractor-e2e-gemini.yaml" \
+  --mode single \
+  "Create a file called hello.py that prints 'Hello from Gemini'. Use the write_file tool."
+```
+
+**Expected result:**
+- `hello.py` exists in the working directory
+- Contains a `print` statement referencing Gemini or hello
+- Verify: `test -f hello.py && grep -qi 'gemini\|hello' hello.py`
+
+### G3: Agent uses web_search tool
+
+```bash
+mkdir -p /tmp/e2e-g3 && cd /tmp/e2e-g3
+amplifier run -B "file://<BUNDLE_ROOT>/profiles/attractor-e2e-gemini.yaml" \
+  --mode single \
+  "Use the web_search tool to search for 'Python 3.12 release date' and tell me the year it was released." \
+  2>&1 | tee output.log
+```
+
+**Expected result:**
+- Agent invokes the `web_search` tool
+- Output contains "2023" or "3.12"
+- Verify: `grep -q '2023\|3\.12' output.log`
+
+### G4: Agent reads then edits a file
+
+```bash
+mkdir -p /tmp/e2e-g4 && cd /tmp/e2e-g4
+echo "print('original content')" > existing.py
+amplifier run -B "file://<BUNDLE_ROOT>/profiles/attractor-e2e-gemini.yaml" \
+  --mode single \
+  "Read the file existing.py, then edit it to also print 'added line'. Use read_file then edit_file."
+```
+
+**Expected result:**
+- `existing.py` contains both "original" and "added" text
+- Verify: `grep -q 'original' existing.py && grep -q 'added' existing.py`
+
+---
+
+## Gemini Pipeline Tests (P1)
+
+Use profile: `profiles/attractor-e2e-pipeline-gemini.yaml`
+
+### Run Gemini pipeline test via pytest
+
+```bash
+GOOGLE_API_KEY=your-key uv run pytest tests/e2e/test_gemini_pipeline.py -v
+```
+
+### P1: Simple pipeline (single node, Gemini)
+
+DOT fixture: `tests/e2e/fixtures/simple_file_creation.dot`
+
+```bash
+mkdir -p /tmp/e2e-p1 && cd /tmp/e2e-p1
+amplifier run -B "file://<BUNDLE_ROOT>/profiles/attractor-e2e-pipeline-gemini.yaml" \
+  --mode single \
+  "Run the pipeline"
+```
+
+**Expected result:**
+- Pipeline executes: start -> implement -> done
+- `hello.py` is created by the Gemini agent session spawned for `implement`
+- Verify: `test -f hello.py && python3 hello.py | grep -qi hello`
+
+---
+
+## Gemini Timeout Guidance
+
+| Test | Typical Duration | Suggested Timeout |
+|------|-----------------|-------------------|
+| G1 Basic invocation | 20-60s | 180s |
+| G2 Creates file | 30-90s | 180s |
+| G3 Web search | 30-90s | 180s |
+| G4 Read then edit | 30-90s | 180s |
+| P1 Pipeline (single node) | 90-180s | 600s |
+
+## Gemini Troubleshooting
+
+- **"No provider configured"** or **"API key missing"**: Check `GOOGLE_API_KEY` is exported
+- **`web_search` not available**: Confirm `tool-search` is included in the profile (it is in `attractor-e2e-gemini.yaml`)
+- **`tool-web` errors**: The Gemini profile includes `tool-web` for URL fetching; ensure network access
+- **Pipeline hangs**: Check that `dot_file` path resolves correctly and that `GOOGLE_API_KEY` is visible to the spawned agent sub-sessions
+- **Timeout**: Gemini pipeline tests spawn full agent sessions per node; 600s is the recommended ceiling

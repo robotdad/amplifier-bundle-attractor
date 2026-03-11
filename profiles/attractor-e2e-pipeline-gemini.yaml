@@ -1,0 +1,65 @@
+bundle:
+  name: attractor-e2e-pipeline-gemini
+  version: 0.1.0
+  description: E2E test profile - Gemini pipeline (spawns agent sessions)
+
+includes:
+  - bundle: attractor:behaviors/attractor-core
+
+agents:
+  attractor-gemini:
+    bundle: attractor:profiles/attractor-profile-gemini
+    description: Gemini coding agent for pipeline nodes
+
+providers:
+  - module: provider-gemini
+    source: git+https://github.com/microsoft/amplifier-module-provider-gemini@main
+    config:
+      default_model: gemini-2.5-pro
+  - module: provider-mock
+    source: git+https://github.com/microsoft/amplifier-module-provider-mock@main
+
+session:
+  orchestrator:
+    module: loop-pipeline
+    source: git+https://github.com/microsoft/amplifier-bundle-attractor@main#subdirectory=modules/loop-pipeline
+    config:
+      dot_file: ./tests/e2e/fixtures/simple_file_creation.dot
+      profiles:
+        gemini: attractor-gemini
+  context:
+    module: context-simple
+    source: git+https://github.com/microsoft/amplifier-module-context-simple@main
+    config:
+      max_tokens: 300000
+      compact_threshold: 0.8
+      auto_compact: true
+
+tools:
+  - module: tool-filesystem
+    source: git+https://github.com/microsoft/amplifier-module-tool-filesystem@main
+  - module: tool-bash
+    source: git+https://github.com/microsoft/amplifier-module-tool-bash@main
+    config:
+      timeout: 120
+  - module: tool-search
+    source: git+https://github.com/microsoft/amplifier-module-tool-search@main
+
+hooks:
+  - module: hooks-logging
+    config:
+      additional_events:
+        - "pipeline:start"
+        - "pipeline:complete"
+        - "pipeline:node_start"
+        - "pipeline:node_complete"
+        - "pipeline:edge_selected"
+        - "pipeline:checkpoint"
+        - "pipeline:goal_gate_check"
+        - "pipeline:error"
+        - "pipeline:stage_retrying"
+        - "pipeline:stage_failed"
+
+context:
+  include:
+    - context/system-gemini.md

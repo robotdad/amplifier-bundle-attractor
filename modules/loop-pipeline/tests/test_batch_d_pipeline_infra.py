@@ -535,7 +535,7 @@ class TestM23CheckpointFidelityDegradation:
 
         class FidelityCapturingBackend:
             async def run(self, node, prompt, context):
-                fidelity = context.get("graph.default_fidelity") or "full"
+                fidelity = context.get("graph.default_fidelity")
                 fidelities_seen.append(fidelity)
                 return "done"
 

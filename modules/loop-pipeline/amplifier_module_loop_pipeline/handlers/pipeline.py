@@ -69,10 +69,12 @@ class PipelineHandler:
         handler_registry_factory: Any = None,
         cancel_event: Any = None,
         hooks: Any = None,
+        backend: Any = None,
     ) -> None:
         self._handler_registry_factory = handler_registry_factory
         self._cancel_event = cancel_event
         self._hooks = hooks
+        self._backend = backend
         self._subgraph_runs: dict[str, Any] = {}
 
     async def _emit(self, event_name: str, data: dict[str, Any]) -> None:
@@ -151,7 +153,11 @@ class PipelineHandler:
         if self._handler_registry_factory is not None:
             child_registry = self._handler_registry_factory()
         else:
-            child_registry = HandlerRegistry()
+            child_registry = HandlerRegistry(
+                backend=self._backend,
+                hooks=self._hooks,
+                cancel_event=self._cancel_event,
+            )
 
         # (9) Create child PipelineEngine
         child_engine = PipelineEngine(

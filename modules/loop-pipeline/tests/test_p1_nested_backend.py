@@ -1,15 +1,12 @@
-"""Baseline test documenting the nested backend wiring bug (P1).
+"""Tests for nested backend wiring (P1).
 
 When a parent pipeline runs a child pipeline via a folder/pipeline node,
-the child HandlerRegistry is created WITHOUT the parent's backend.
-This means child codergen nodes bypass the backend entirely.
+the child HandlerRegistry should receive the parent's backend so that
+child codergen nodes call the backend correctly.
 
-These tests PASS before the fix is applied:
-- test_backend_not_propagated_to_child_currently: documents the bug
+Tests:
+- test_backend_propagated_to_child: asserts backend IS propagated (post-fix)
 - test_parent_codergen_uses_backend: baseline confirmation
-
-After the fix, test_backend_not_propagated_to_child_currently should FAIL
-and be replaced with a test asserting the backend IS propagated.
 """
 
 from __future__ import annotations
@@ -42,6 +39,10 @@ class SpyBackend:
         self.calls.append((node.id, prompt))
         return "done"
 
+    def was_called_for(self, node_id: str) -> bool:
+        """Return True if the backend was called for the given node_id."""
+        return any(call[0] == node_id for call in self.calls)
+
 
 # ---------------------------------------------------------------------------
 # CHILD_DOT constant: simple child pipeline
@@ -73,18 +74,15 @@ def _write_dot(path: str, content: str) -> None:
 
 
 class TestNestedBackendWiring:
-    """Documents the nested backend wiring bug and provides a baseline check."""
+    """Tests for nested backend wiring in pipeline execution."""
 
     @pytest.mark.asyncio
-    async def test_backend_not_propagated_to_child_currently(self, tmp_path):
-        """Child codergen nodes do NOT receive the parent's backend (documents bug).
+    async def test_backend_propagated_to_child(self, tmp_path):
+        """Child codergen nodes DO receive the parent's backend (post-fix).
 
         When a folder node launches a child pipeline, PipelineHandler creates a
-        new HandlerRegistry() without forwarding the backend. As a result, the
-        spy backend does not record calls from the child's codergen nodes.
-
-        This test PASSES before the fix, documenting the current broken behavior.
-        After the fix is applied, this assertion should be inverted (or replaced).
+        new HandlerRegistry with the backend forwarded. As a result, the
+        spy backend records calls from the child's codergen nodes.
         """
         # Write child.dot to tmp_path
         child_dot_path = str(tmp_path / "child.dot")
@@ -118,12 +116,11 @@ digraph parent {
         # Parent pipeline should still succeed overall
         assert outcome.status == StageStatus.SUCCESS
 
-        # BUG DOCUMENTED: child_work is NOT called via spy because
-        # PipelineHandler creates HandlerRegistry() without the backend.
-        called_node_ids = [call[0] for call in spy.calls]
-        assert "child_work" not in called_node_ids, (
-            "Expected child_work NOT in spy calls — documents the bug that "
-            "backend is not propagated to child pipelines"
+        # FIX VERIFIED: child_work IS called via spy because
+        # PipelineHandler now creates HandlerRegistry(backend=self._backend).
+        assert spy.was_called_for("child_work") is True, (
+            "Expected child_work in spy calls — backend should be propagated "
+            "to child pipelines via PipelineHandler"
         )
 
     @pytest.mark.asyncio

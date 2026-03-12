@@ -1,0 +1,23 @@
+// demo-convergence-factory.dot -- Parent pipeline invoking the convergence
+// factory pattern to generate a validated Python utility module.
+//
+// The generate_utils folder node injects context.* attrs into the child
+// pipeline via P7's context variable injection mechanism, so the reusable
+// convergence-factory.dot pattern receives $artifact_goal, $artifact_path,
+// $validation_criteria, and $validation_command as plain context variables.
+
+digraph demo_factory {
+    graph [goal="Generate a validated Python utility module"]
+
+    start [shape=Mdiamond]
+
+    generate_utils [shape=folder, dot_file="convergence-factory.dot",
+        context.artifact_goal="Create a Python file with a function 'greet(name)' that returns 'Hello, {name}!'",
+        context.artifact_path="utils.py",
+        context.validation_criteria="File exists, contains def greet, returns correct greeting format",
+        context.validation_command="python3 -c 'from utils import greet; assert greet(\"World\") == \"Hello, World!\"'"]
+
+    done [shape=Msquare]
+
+    start -> generate_utils -> done
+}

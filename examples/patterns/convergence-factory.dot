@@ -1,0 +1,76 @@
+// convergence-factory.dot -- Reusable convergence factory pattern.
+//
+// Iterative generate → validate → assess → feedback → loop cycle that runs
+// until the artifact meets quality criteria.  Designed to be invoked as a
+// nested pipeline from a parent folder/house node using P7's context.*
+// injection mechanism.
+//
+// Required context variables (injected by parent via context.* attrs):
+//   $artifact_goal        — Description of what to generate / refine
+//   $artifact_path        — Path where the artifact should be written
+//   $validation_criteria  — Semantic quality criteria for the assess node
+//   $validation_command   — Shell command to mechanically validate the artifact
+//
+// Routing logic:
+//   assess codergen sets preferred_label="converged" or preferred_label="refine"
+//   check diamond routes via context.preferred_label conditions
+//   feedback -> generate edge has loop_restart=true to reset iteration state
+
+digraph convergence_factory {
+    graph [goal="Generate, validate, and refine an artifact until it converges"]
+
+    // Entry point
+    start [shape=Mdiamond, label="Factory Start"]
+
+    // generate: produces or refines the artifact.
+    // On subsequent iterations, should read prior feedback from .ai/feedback/.
+    generate [
+        label="Generate Artifact",
+        prompt="You are generating or refining an artifact.\n\nArtifact goal: $artifact_goal\n\nArtifact path: $artifact_path\n\nBefore generating, check .ai/feedback/ for any prior refinement guidance from previous iterations and incorporate it.\n\nGenerate or update the artifact now, writing it to $artifact_path."
+    ]
+
+    // validate: runs mechanical validation (syntax check, parse check, tests).
+    // tool_command is set from $validation_command injected by the parent.
+    // On failure the pipeline halts; on success proceeds to assess.
+    validate [
+        shape=parallelogram,
+        label="Validate Artifact",
+        tool_command="$validation_command"
+    ]
+
+    // assess: semantically evaluates the artifact against $validation_criteria.
+    // Must set preferred_label="converged" when criteria are met, or
+    // preferred_label="refine" when further improvement is required.
+    assess [
+        label="Assess Quality",
+        prompt="You are assessing whether an artifact meets quality criteria.\n\nArtifact goal: $artifact_goal\n\nValidation criteria: $validation_criteria\n\nReview the artifact at $artifact_path and the validation results.\nDetermine whether the artifact fully satisfies all of the validation criteria.\n\nIf it fully meets the criteria: return outcome 'converged'.\nIf it needs further improvement: return outcome 'refine'.\n\nWrite a brief assessment summary to .ai/assessment.md before returning."
+    ]
+
+    // check: diamond routing node.
+    // Routes to 'done' when assess says converged, to 'feedback' when refine.
+    check [shape=diamond, label="Converged?"]
+
+    // feedback: reached only when assess returns 'refine'.
+    // Reads the assessment and all prior feedback, then writes targeted
+    // refinement guidance to .ai/feedback/ using the Pyramid Summary pattern.
+    feedback [
+        label="Write Feedback",
+        prompt="You are writing targeted refinement guidance for the next iteration.\n\nArtifact goal: $artifact_goal\n\nValidation criteria: $validation_criteria\n\nRead the current assessment from .ai/assessment.md and any prior feedback files in .ai/feedback/.\nWrite a new feedback file to .ai/feedback/ using the Pyramid Summary pattern:\n  1. Key finding (1 sentence) — what is the most important issue\n  2. What to change (3-5 bullet points) — specific, actionable improvements\n  3. Why it matters (1-2 sentences) — how this moves toward the goal\n\nBe precise and constructive. Focus on the delta needed to converge."
+    ]
+
+    // Exit point — reached only when assess returns 'converged'
+    done [shape=Msquare, label="Factory Done"]
+
+    // Flow
+    start -> generate
+    generate -> validate
+    validate -> assess
+    assess -> check
+
+    // Route based on assess's preferred_label (stored in context.preferred_label)
+    check -> done     [label="converged", condition="context.preferred_label=converged"]
+    check -> feedback [label="refine",    condition="context.preferred_label=refine"]
+
+    // Loop back: loop_restart resets iteration state and re-runs from generate
+    feedback -> generate [loop_restart="true"]
+}

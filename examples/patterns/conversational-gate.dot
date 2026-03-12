@@ -1,0 +1,59 @@
+// conversational-gate.dot -- Reusable conversational gate pattern.
+//
+// Iterative human Q&A loop that runs until sufficient evidence is provided.
+// Designed to be invoked as a nested pipeline from a parent folder/house node
+// using P7's context.* injection mechanism.
+//
+// Required context variables (injected by parent via context.* attrs):
+//   $gate_topic        — Question/prompt presented to the human
+//   $gate_criteria     — Evaluation criteria for the AI to judge sufficiency
+//   $gate_output_path  — Where to write the final scored output
+//
+// Human response key (from wait.human handler):
+//   human.gate.selected — Captures the routing selection ("continue")
+//                         when the human submits a response.
+//
+// Routing logic:
+//   eval codergen sets preferred_label="scored" or preferred_label="need_more"
+//   check diamond routes via context.preferred_label conditions
+
+digraph conversational_gate {
+    graph [goal="Iterative human Q&A gate: loop until sufficient evidence"]
+
+    // Entry point
+    start [shape=Mdiamond, label="Gate Start"]
+
+    // ask: presents the gate topic to the human and collects a freeform response.
+    // The single labeled edge "continue" routes to eval after the human submits.
+    // human.gate.selected will be "continue" after this node runs.
+    ask [
+        shape=hexagon,
+        label="Ask Human",
+        prompt="$gate_topic"
+    ]
+
+    // eval: evaluates whether the human's response meets the gate criteria.
+    // The AI backend must return preferred_label="scored" if sufficient,
+    // or preferred_label="need_more" if more detail is needed.
+    // $context expands to last_response (from the previous eval iteration).
+    eval [
+        label="Evaluate Response",
+        prompt="You are evaluating a conversational gate.\n\nGate topic: $gate_topic\n\nEvaluation criteria: $gate_criteria\n\nThe human has just responded (their selection is in context). Based on the conversation so far and the criteria above, decide:\n- If sufficient evidence has been provided: return outcome 'scored'\n- If more detail is needed: return outcome 'need_more'\n\nPrevious context: $context"
+    ]
+
+    // check: diamond routing node.
+    // Routes to 'done' when eval says scored, loops back to 'ask' when need_more.
+    check [shape=diamond, label="Sufficient?"]
+
+    // done: terminal node
+    done [shape=Msquare, label="Gate Done"]
+
+    // Flow
+    start -> ask
+    ask -> eval [label="continue"]
+    eval -> check
+
+    // Route based on eval's preferred_label (stored in context.preferred_label)
+    check -> done [label="scored",    condition="context.preferred_label=scored"]
+    check -> ask  [label="need_more", condition="context.preferred_label=need_more"]
+}

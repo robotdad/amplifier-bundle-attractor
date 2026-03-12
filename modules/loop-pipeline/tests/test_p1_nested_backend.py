@@ -163,3 +163,76 @@ digraph parent {
         assert "parent_work" in called_node_ids, (
             "Expected parent_work in spy calls — baseline: parent backend works"
         )
+
+
+# ---------------------------------------------------------------------------
+# TestManagerLoopBackendWiring
+# ---------------------------------------------------------------------------
+
+
+class TestManagerLoopBackendWiring:
+    """Tests for backend propagation through ManagerLoopHandler._run_child_dotfile."""
+
+    @pytest.mark.asyncio
+    async def test_manager_child_dotfile_backend_propagated(self, tmp_path):
+        """Backend IS propagated to child pipelines launched by ManagerLoopHandler.
+
+        When a house node uses stack.child_dotfile to run a child pipeline,
+        the child HandlerRegistry must receive the parent's backend so that
+        child codergen nodes call the backend correctly.
+        """
+        # Write managed_child.dot to tmp_path with a worker node
+        managed_child_dot = (
+            "digraph managed_child {\n"
+            "  start [shape=Mdiamond];\n"
+            '  worker [prompt="Do worker work"];\n'
+            "  done [shape=Msquare];\n"
+            "  start -> worker -> done;\n"
+            "}\n"
+        )
+        child_dot_path = tmp_path / "managed_child.dot"
+        child_dot_path.write_text(managed_child_dot)
+
+        # Build parent graph with a house node using stack.child_dotfile
+        manager_node = Node(
+            id="manager",
+            shape="house",
+            attrs={
+                "manager.max_cycles": "1",
+                "stack.child_dotfile": str(child_dot_path),
+            },
+        )
+        parent_graph = Graph(
+            name="parent",
+            nodes={
+                "start": Node(id="start", shape="Mdiamond"),
+                "manager": manager_node,
+                "done": Node(id="done", shape="Msquare"),
+            },
+            edges=[
+                Edge(from_node="start", to_node="manager"),
+                Edge(from_node="manager", to_node="done"),
+            ],
+        )
+        parent_graph.source_dir = str(tmp_path)
+
+        spy = SpyBackend()
+        context = PipelineContext()
+        registry = HandlerRegistry(backend=spy)
+        logs_root = str(tmp_path / "logs")
+
+        engine = PipelineEngine(
+            graph=parent_graph,
+            context=context,
+            handler_registry=registry,
+            logs_root=logs_root,
+        )
+        await engine.run()
+
+        # FIX VERIFIED: worker IS called via spy because
+        # ManagerLoopHandler._run_child_dotfile now creates
+        # HandlerRegistry(backend=self._backend).
+        assert spy.was_called_for("worker") is True, (
+            "Expected worker in spy calls — backend should be propagated "
+            "to child pipelines via ManagerLoopHandler._run_child_dotfile"
+        )

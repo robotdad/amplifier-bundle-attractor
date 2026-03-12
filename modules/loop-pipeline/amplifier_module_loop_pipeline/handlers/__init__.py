@@ -71,6 +71,9 @@ class HandlerRegistry:
             ),
             "stack.manager_loop": ManagerLoopHandler(
                 subgraph_runner=kwargs.get("subgraph_runner"),
+                backend=kwargs.get("backend"),
+                hooks=self._hooks,
+                cancel_event=kwargs.get("cancel_event"),
             ),
             "parallel": ParallelHandler(
                 subgraph_runner=kwargs.get("subgraph_runner"),

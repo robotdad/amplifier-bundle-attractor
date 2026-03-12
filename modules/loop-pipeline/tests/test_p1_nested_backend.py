@@ -227,7 +227,10 @@ class TestManagerLoopBackendWiring:
             handler_registry=registry,
             logs_root=logs_root,
         )
-        await engine.run()
+        outcome = await engine.run()
+
+        # Pipeline should succeed before we assert backend propagation
+        assert outcome.status == StageStatus.SUCCESS
 
         # FIX VERIFIED: worker IS called via spy because
         # ManagerLoopHandler._run_child_dotfile now creates

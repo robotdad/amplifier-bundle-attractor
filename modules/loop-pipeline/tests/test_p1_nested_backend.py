@@ -14,18 +14,18 @@ and be replaced with a test asserting the backend IS propagated.
 
 from __future__ import annotations
 
-import os
+import os  # noqa: F401 — used in future P1 test phases
 
 import pytest
 
 from amplifier_module_loop_pipeline.context import PipelineContext
 from amplifier_module_loop_pipeline.dot_parser import parse_dot
 from amplifier_module_loop_pipeline.engine import PipelineEngine
-from amplifier_module_loop_pipeline.graph import Edge, Graph, Node
+from amplifier_module_loop_pipeline.graph import Edge, Graph, Node  # noqa: F401 — Edge/Graph staged for future phases
 from amplifier_module_loop_pipeline.handlers import HandlerRegistry
-from amplifier_module_loop_pipeline.handlers.manager_loop import ManagerLoopHandler
-from amplifier_module_loop_pipeline.handlers.pipeline import PipelineHandler
-from amplifier_module_loop_pipeline.outcome import Outcome, StageStatus
+from amplifier_module_loop_pipeline.handlers.manager_loop import ManagerLoopHandler  # noqa: F401 — staged for future phases
+from amplifier_module_loop_pipeline.handlers.pipeline import PipelineHandler  # noqa: F401 — staged for future phases
+from amplifier_module_loop_pipeline.outcome import Outcome, StageStatus  # noqa: F401 — Outcome staged for future phases
 
 # ---------------------------------------------------------------------------
 # SpyBackend

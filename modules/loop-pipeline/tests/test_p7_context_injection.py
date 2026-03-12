@@ -4,8 +4,11 @@ When a folder node (PipelineHandler) or house node (ManagerLoopHandler) has
 attributes like context.my_var="hello", the child pipeline should be able to
 reference $my_var in its prompts.
 
-Task 6: Baseline tests documenting the current (broken) behavior.
-Task 8: Tests replaced/added after the fix is in place.
+Task 6 baselines replaced by Task 8 post-fix tests.
+
+Tests:
+- TestContextInjectionPipelineHandler: PipelineHandler (folder/pipeline nodes)
+- TestContextInjectionManagerLoop: ManagerLoopHandler (house nodes)
 """
 
 from __future__ import annotations
@@ -58,30 +61,20 @@ def _write_dot(path: str, content: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# TestContextInjectionPipelineHandler — baselines (Task 6)
+# TestContextInjectionPipelineHandler
 # ---------------------------------------------------------------------------
 
 
 class TestContextInjectionPipelineHandler:
-    """Baseline tests documenting context injection behavior for folder nodes.
-
-    These tests document the CURRENT state of the system:
-    - test_context_attr_not_injected_today: BUG — $topic is NOT expanded today
-    - test_parent_context_key_available_in_child_before_fix: $goal works via clone
-
-    Both should PASS (they document current behavior, not desired behavior).
-    """
+    """Tests for context injection via folder (pipeline) nodes."""
 
     @pytest.mark.asyncio
-    async def test_context_attr_not_injected_today(self, tmp_path):
-        """BUG BASELINE: context.topic attr on folder node is NOT injected today.
+    async def test_context_attr_injected_into_child(self, tmp_path):
+        """context.topic attr on folder node IS injected and $topic expands in child.
 
-        Parent has context.topic="auth service" on the folder node.
-        Child DOT has $topic in its prompt.
-        Without the fix, $topic is NOT expanded — the raw token remains.
-
-        This test PASSES today (it documents the bug).
-        It will be REPLACED by test_context_attr_injected_into_child after the fix.
+        After the fix, the folder node's context.topic="auth service" attribute
+        causes $topic to be expanded in the child pipeline's prompts.
+        Assert "auth service" IS in the child prompt (not $topic).
         """
         child_dot = """\
 digraph child {
@@ -97,7 +90,7 @@ digraph child {
         parent_dot = f"""\
 digraph parent {{
     start [shape=Mdiamond]
-    sub [shape=folder, dot_file="{child_path}", "context.topic"="auth service"]
+    sub [shape=folder, dot_file="{child_path}", context.topic="auth service"]
     done [shape=Msquare]
     start -> sub -> done
 }}
@@ -120,14 +113,115 @@ digraph parent {{
 
         assert outcome.status == StageStatus.SUCCESS
         work_prompt = capturing.prompt_for("work")
-
-        # BUG DOCUMENTED: $topic is NOT expanded — raw token remains in prompt
-        assert "$topic" in work_prompt, (
-            f"Expected raw '$topic' to remain in prompt (bug documented), "
-            f"got: {work_prompt!r}"
+        assert "auth service" in work_prompt, (
+            f"Expected 'auth service' in child prompt after fix, got: {work_prompt!r}"
         )
-        assert "auth service" not in work_prompt, (
-            f"Expected 'auth service' NOT in prompt before fix, got: {work_prompt!r}"
+        assert "$topic" not in work_prompt, (
+            f"Expected $topic to be expanded (not raw), got: {work_prompt!r}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_multiple_context_attrs_all_injected(self, tmp_path):
+        """Multiple context.* attrs all get injected and expanded in child.
+
+        Parent sets context.topic, context.criteria, context.output_path.
+        All three should appear expanded in the child prompt.
+        """
+        child_dot = """\
+digraph child {
+    start [shape=Mdiamond]
+    work [prompt="Review $topic against $criteria and write to $output_path"]
+    done [shape=Msquare]
+    start -> work -> done
+}
+"""
+        child_path = tmp_path / "child.dot"
+        _write_dot(str(child_path), child_dot)
+
+        parent_dot = f"""\
+digraph parent {{
+    start [shape=Mdiamond]
+    sub [shape=folder, dot_file="{child_path}", context.topic="auth module", context.criteria="security requirements", context.output_path="/tmp/review.md"]
+    done [shape=Msquare]
+    start -> sub -> done
+}}
+"""
+        graph = parse_dot(parent_dot)
+        graph.source_dir = str(tmp_path)
+
+        capturing = CapturingBackend()
+        context = PipelineContext()
+        registry = HandlerRegistry(backend=capturing)
+        logs_root = str(tmp_path / "logs")
+
+        engine = PipelineEngine(
+            graph=graph,
+            context=context,
+            handler_registry=registry,
+            logs_root=logs_root,
+        )
+        outcome = await engine.run()
+
+        assert outcome.status == StageStatus.SUCCESS
+        work_prompt = capturing.prompt_for("work")
+        assert "auth module" in work_prompt, (
+            f"Expected 'auth module' in child prompt, got: {work_prompt!r}"
+        )
+        assert "security requirements" in work_prompt, (
+            f"Expected 'security requirements' in child prompt, got: {work_prompt!r}"
+        )
+        assert "/tmp/review.md" in work_prompt, (
+            f"Expected '/tmp/review.md' in child prompt, got: {work_prompt!r}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_context_attrs_do_not_pollute_parent_context(self, tmp_path):
+        """Injected context.* keys stay in child only — parent is NOT polluted.
+
+        After running a folder node with context.topic="auth service",
+        the parent PipelineContext should NOT have "topic" as a key.
+        """
+        child_dot = """\
+digraph child {
+    start [shape=Mdiamond]
+    work [prompt="Review $topic"]
+    done [shape=Msquare]
+    start -> work -> done
+}
+"""
+        child_path = tmp_path / "child.dot"
+        _write_dot(str(child_path), child_dot)
+
+        parent_dot = f"""\
+digraph parent {{
+    start [shape=Mdiamond]
+    sub [shape=folder, dot_file="{child_path}", context.topic="auth service"]
+    done [shape=Msquare]
+    start -> sub -> done
+}}
+"""
+        graph = parse_dot(parent_dot)
+        graph.source_dir = str(tmp_path)
+
+        capturing = CapturingBackend()
+        parent_context = PipelineContext()
+        registry = HandlerRegistry(backend=capturing)
+        logs_root = str(tmp_path / "logs")
+
+        engine = PipelineEngine(
+            graph=graph,
+            context=parent_context,
+            handler_registry=registry,
+            logs_root=logs_root,
+        )
+        outcome = await engine.run()
+
+        assert outcome.status == StageStatus.SUCCESS
+
+        # Parent context must NOT have "topic" injected into it
+        assert parent_context.get("topic") is None, (
+            f"Expected 'topic' NOT in parent context after child run, "
+            f"but got: {parent_context.get('topic')!r}"
         )
 
     @pytest.mark.asyncio
@@ -181,4 +275,68 @@ digraph parent {{
         assert "user authentication" in work_prompt, (
             f"Expected parent's goal 'user authentication' in child prompt "
             f"(this works via clone), got: {work_prompt!r}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# TestContextInjectionManagerLoop
+# ---------------------------------------------------------------------------
+
+
+class TestContextInjectionManagerLoop:
+    """Tests for context injection via house (manager loop) nodes."""
+
+    @pytest.mark.asyncio
+    async def test_manager_context_attr_injected(self, tmp_path):
+        """house node with context.task attr injects $task into child prompt.
+
+        The manager node has context.task="build auth module". The child pipeline's
+        prompt references $task. After the fix, $task should expand to
+        "build auth module" in the child's prompt.
+        """
+        child_dot = """\
+digraph child {
+    start [shape=Mdiamond]
+    work [prompt="Execute: $task"]
+    done [shape=Msquare]
+    start -> work -> done
+}
+"""
+        child_path = tmp_path / "child.dot"
+        _write_dot(str(child_path), child_dot)
+
+        parent_dot = f"""\
+digraph parent {{
+    start [shape=Mdiamond]
+    mgr [shape=house, stack.child_dotfile="{child_path}", manager.max_cycles=1, context.task="build auth module"]
+    done [shape=Msquare]
+    start -> mgr -> done
+}}
+"""
+        graph = parse_dot(parent_dot)
+        graph.source_dir = str(tmp_path)
+
+        capturing = CapturingBackend()
+        context = PipelineContext()
+        registry = HandlerRegistry(backend=capturing)
+        logs_root = str(tmp_path / "logs")
+
+        engine = PipelineEngine(
+            graph=graph,
+            context=context,
+            handler_registry=registry,
+            logs_root=logs_root,
+        )
+        outcome = await engine.run()
+
+        # The child should succeed (work node returns "done")
+        assert outcome.status == StageStatus.SUCCESS
+
+        work_prompt = capturing.prompt_for("work")
+        assert "build auth module" in work_prompt, (
+            f"Expected 'build auth module' in child prompt after manager fix, "
+            f"got: {work_prompt!r}"
+        )
+        assert "$task" not in work_prompt, (
+            f"Expected $task to be expanded (not raw), got: {work_prompt!r}"
         )

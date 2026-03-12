@@ -145,6 +145,12 @@ class PipelineHandler:
         # (6) Clone parent context
         child_context = context.clone()
 
+        # (6b) Inject context.* attributes from this folder node into child context.
+        for attr_key, attr_value in node.attrs.items():
+            if attr_key.startswith("context."):
+                child_key = attr_key[len("context.") :]
+                child_context.set(child_key, str(attr_value))
+
         # (7) Create child logs dir
         child_logs = os.path.join(logs_root, f"subgraph_{node.id}")
         os.makedirs(child_logs, exist_ok=True)

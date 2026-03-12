@@ -177,6 +177,13 @@ class ManagerLoopHandler:
         for cycle in range(1, max_cycles + 1):
             # 1. OBSERVE — build child context and run child subgraph
             child_context = context.clone()
+
+            # (1b) Inject context.* attributes from this house node into child context.
+            for attr_key, attr_value in node.attrs.items():
+                if attr_key.startswith("context."):
+                    child_key = attr_key[len("context.") :]
+                    child_context.set(child_key, str(attr_value))
+
             if "steer" in actions and last_outcome is not None:
                 # M-15: Structured steering with full cycle context
                 steering = _build_steering_message(

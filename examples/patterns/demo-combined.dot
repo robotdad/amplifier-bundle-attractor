@@ -1,0 +1,28 @@
+// demo-combined.dot -- Parent pipeline that composes BOTH reusable patterns:
+// first a conversational gate gathers requirements, then a convergence factory
+// generates an artifact based on those requirements.
+//
+// This demonstrates the integration of two reusable patterns via P7's
+// context.* injection mechanism. Each folder node injects the required
+// context variables into its respective child pipeline.
+
+digraph demo_combined {
+    graph [goal="Gather requirements then generate artifact to specification"]
+
+    start [shape=Mdiamond]
+
+    gather_requirements [shape=folder, dot_file="conversational-gate.dot",
+        context.gate_topic="What artifact should we generate? Describe the file name, purpose, and acceptance criteria.",
+        context.gate_criteria="Must include: file name, clear purpose, at least 2 concrete acceptance criteria.",
+        context.gate_output_path=".ai/requirements.md"]
+
+    generate_artifact [shape=folder, dot_file="convergence-factory.dot",
+        context.artifact_goal="Generate the artifact described in .ai/requirements.md",
+        context.artifact_path="output.py",
+        context.validation_criteria="File exists, matches the requirements in .ai/requirements.md, all acceptance criteria met",
+        context.validation_command="python3 -c 'import output; print(output)'"]
+
+    done [shape=Msquare]
+
+    start -> gather_requirements -> generate_artifact -> done
+}

@@ -239,3 +239,126 @@ digraph managed_child {
             "Expected worker in spy calls — backend should be propagated "
             "to child pipelines via ManagerLoopHandler._run_child_dotfile"
         )
+
+
+# ---------------------------------------------------------------------------
+# TestThreeLevelNesting
+# ---------------------------------------------------------------------------
+
+
+class TestThreeLevelNesting:
+    """Tests confirming backend propagation depth across 3 levels (A → B → C)."""
+
+    LEAF_DOT = """\
+digraph leaf {
+    start [shape=Mdiamond]
+    leaf_work [prompt="Do leaf work"]
+    done [shape=Msquare]
+    start -> leaf_work -> done
+}
+"""
+
+    MID_DOT = """\
+digraph mid {
+    start [shape=Mdiamond]
+    mid_work [prompt="Do mid work"]
+    sub [shape=folder, dot_file="leaf.dot"]
+    done [shape=Msquare]
+    start -> mid_work -> sub -> done
+}
+"""
+
+    PARENT_DOT = """\
+digraph parent {
+    start [shape=Mdiamond]
+    parent_work [prompt="Do parent work"]
+    sub [shape=folder, dot_file="mid.dot"]
+    done [shape=Msquare]
+    start -> parent_work -> sub -> done
+}
+"""
+
+    def _setup_three_level(self, tmp_path):
+        """Write leaf.dot and mid.dot; return parsed parent graph + SpyBackend."""
+        _write_dot(str(tmp_path / "leaf.dot"), self.LEAF_DOT)
+        _write_dot(str(tmp_path / "mid.dot"), self.MID_DOT)
+
+        graph = parse_dot(self.PARENT_DOT)
+        graph.source_dir = str(tmp_path)
+
+        spy = SpyBackend()
+        return graph, spy
+
+    @pytest.mark.asyncio
+    async def test_three_level_nesting_backend_propagated(self, tmp_path):
+        """All three levels (parent_work, mid_work, leaf_work) are called via the backend.
+
+        Confirms that backend propagation works across 3 levels of nesting:
+        parent → mid (folder) → leaf (folder).
+        """
+        graph, spy = self._setup_three_level(tmp_path)
+
+        context = PipelineContext()
+        registry = HandlerRegistry(backend=spy)
+        logs_root = str(tmp_path / "logs")
+
+        engine = PipelineEngine(
+            graph=graph,
+            context=context,
+            handler_registry=registry,
+            logs_root=logs_root,
+        )
+        outcome = await engine.run()
+
+        assert outcome.status == StageStatus.SUCCESS
+
+        assert spy.was_called_for("parent_work") is True, (
+            "Expected parent_work in spy calls — top-level codergen node must call backend"
+        )
+        assert spy.was_called_for("mid_work") is True, (
+            "Expected mid_work in spy calls — backend must propagate to level 2"
+        )
+        assert spy.was_called_for("leaf_work") is True, (
+            "Expected leaf_work in spy calls — backend must propagate to level 3"
+        )
+
+    @pytest.mark.asyncio
+    async def test_three_level_call_order(self, tmp_path):
+        """Backend calls follow depth-first order: parent_work → mid_work → leaf_work.
+
+        Confirms that the execution order is depth-first: the parent codergen node
+        runs before descending into mid, which runs before descending into leaf.
+        """
+        graph, spy = self._setup_three_level(tmp_path)
+
+        context = PipelineContext()
+        registry = HandlerRegistry(backend=spy)
+        logs_root = str(tmp_path / "logs")
+
+        engine = PipelineEngine(
+            graph=graph,
+            context=context,
+            handler_registry=registry,
+            logs_root=logs_root,
+        )
+        outcome = await engine.run()
+
+        assert outcome.status == StageStatus.SUCCESS
+
+        called_ids = [call[0] for call in spy.calls]
+        assert "parent_work" in called_ids, "parent_work must appear in spy calls"
+        assert "mid_work" in called_ids, "mid_work must appear in spy calls"
+        assert "leaf_work" in called_ids, "leaf_work must appear in spy calls"
+
+        parent_idx = called_ids.index("parent_work")
+        mid_idx = called_ids.index("mid_work")
+        leaf_idx = called_ids.index("leaf_work")
+
+        assert parent_idx < mid_idx, (
+            f"Expected parent_work (idx={parent_idx}) before mid_work (idx={mid_idx}) "
+            "— depth-first order: parent runs before entering mid pipeline"
+        )
+        assert mid_idx < leaf_idx, (
+            f"Expected mid_work (idx={mid_idx}) before leaf_work (idx={leaf_idx}) "
+            "— depth-first order: mid runs before entering leaf pipeline"
+        )

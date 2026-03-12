@@ -182,14 +182,14 @@ class TestManagerLoopBackendWiring:
         child codergen nodes call the backend correctly.
         """
         # Write managed_child.dot to tmp_path with a worker node
-        managed_child_dot = (
-            "digraph managed_child {\n"
-            "  start [shape=Mdiamond];\n"
-            '  worker [prompt="Do worker work"];\n'
-            "  done [shape=Msquare];\n"
-            "  start -> worker -> done;\n"
-            "}\n"
-        )
+        managed_child_dot = """\
+digraph managed_child {
+  start [shape=Mdiamond];
+  worker [prompt="Do worker work"];
+  done [shape=Msquare];
+  start -> worker -> done;
+}
+"""
         child_dot_path = tmp_path / "managed_child.dot"
         child_dot_path.write_text(managed_child_dot)
 

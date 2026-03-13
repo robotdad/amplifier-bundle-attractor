@@ -89,6 +89,8 @@ After testing the area/case:
 - You've tested the current area and either it passes or you've fixed it
 - You encounter a blocker you can't resolve -- add it to blockers in $qa_state_file
 - Stop gracefully -- the outer recipe will continue with the next area
+- Do NOT attempt to fix issues outside the $next_test area -- log them as blockers instead
+- Always update $qa_context_file with your findings before stopping, even on a clean pass
 
 ## SAFETY CONSTRAINTS (MANDATORY -- NEVER VIOLATE)
 - Your working directory is $project_dir. Do NOT read, write, or execute commands on files outside this directory.

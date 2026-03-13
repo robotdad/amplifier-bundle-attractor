@@ -96,7 +96,7 @@ class TestIterationParse:
         assert count == 3, f"Expected 3 diamond nodes, got {count}"
 
     def test_box_count(self):
-        """Exactly 1 box (codergen/LLM) node."""
+        """Exactly 1 box (codegen/LLM) node."""
         graph = _graph()
         count = sum(1 for n in graph.nodes.values() if n.shape == "box")
         assert count == 1, f"Expected 1 box node, got {count}"

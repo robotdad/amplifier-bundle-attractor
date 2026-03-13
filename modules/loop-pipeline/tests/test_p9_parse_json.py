@@ -10,7 +10,8 @@ Tests:
 - test_parse_json_injects_dict_keys_into_context: JSON dict keys injected into context
 - test_without_parse_json_does_not_parse: JSON stdout NOT parsed when flag absent
 - test_parse_json_malformed_json_logs_warning_and_succeeds: bad JSON → WARNING + SUCCESS
-- test_parse_json_non_dict_not_injected: arrays/primitives not injected into context
+- test_parse_json_array_not_injected: JSON array not injected into context
+- test_parse_json_primitive_not_injected: JSON primitive not injected into context
 - test_parse_json_keys_in_context_updates: injected keys appear in outcome.context_updates
 - test_parse_json_tool_output_still_set: tool.output set in context even with parse_json
 - test_parse_json_not_invoked_on_failed_command: FAIL command → parse_json NOT invoked
@@ -140,15 +141,14 @@ class TestParseJson:
         )
 
     @pytest.mark.asyncio
-    async def test_parse_json_non_dict_not_injected(self, tmp_path):
-        """Non-dict JSON (arrays, primitives) does not inject keys into context.
+    async def test_parse_json_array_not_injected(self, tmp_path):
+        """JSON array output does not inject keys into context.
 
-        If the parsed JSON result is a list, string, number, or bool,
-        no keys should be injected into context.
+        If the parsed JSON result is a list, no keys should be injected
+        into context (only dict results are injected).
         """
-        # Test with a JSON array
         array_payload = json.dumps(["item1", "item2", "item3"])
-        node_array = Node(
+        node = Node(
             id="tool_array",
             attrs={
                 "tool_command": f"echo '{array_payload}'",
@@ -157,7 +157,7 @@ class TestParseJson:
         )
         handler = ToolHandler()
         ctx = _make_context()
-        outcome = await handler.execute(node_array, ctx, _make_graph(), str(tmp_path))
+        outcome = await handler.execute(node, ctx, _make_graph(), str(tmp_path))
 
         assert outcome.status == StageStatus.SUCCESS, (
             f"Expected SUCCESS for array JSON, got {outcome.status!r}"
@@ -167,20 +167,26 @@ class TestParseJson:
             f"Expected no key '0' injected for array JSON, got {ctx.get('0')!r}"
         )
 
-        # Test with a JSON primitive (number)
-        prim_payload = "42"
-        node_prim = Node(
+    @pytest.mark.asyncio
+    async def test_parse_json_primitive_not_injected(self, tmp_path):
+        """JSON primitive output does not inject keys into context.
+
+        If the parsed JSON result is a number, string, or bool, no keys
+        should be injected into context (only dict results are injected).
+        """
+        node = Node(
             id="tool_prim",
             attrs={
-                "tool_command": f"echo '{prim_payload}'",
+                "tool_command": "echo '42'",
                 "parse_json": "true",
             },
         )
-        ctx2 = _make_context()
-        outcome2 = await handler.execute(node_prim, ctx2, _make_graph(), str(tmp_path))
+        handler = ToolHandler()
+        ctx = _make_context()
+        outcome = await handler.execute(node, ctx, _make_graph(), str(tmp_path))
 
-        assert outcome2.status == StageStatus.SUCCESS, (
-            f"Expected SUCCESS for primitive JSON, got {outcome2.status!r}"
+        assert outcome.status == StageStatus.SUCCESS, (
+            f"Expected SUCCESS for primitive JSON, got {outcome.status!r}"
         )
 
     @pytest.mark.asyncio

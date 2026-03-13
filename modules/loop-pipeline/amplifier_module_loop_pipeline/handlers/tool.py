@@ -28,6 +28,8 @@ from ..outcome import Outcome, StageStatus
 
 logger = logging.getLogger(__name__)
 
+_LOG_TRUNCATE_CHARS = 200
+
 
 class ToolHandler:
     """Handler for tool nodes (shape=parallelogram).
@@ -129,7 +131,7 @@ class ToolHandler:
                     logger.warning(
                         "parse_json: failed to parse JSON output from node %r: %r",
                         node.id,
-                        stdout_text[:200],
+                        stdout_text[:_LOG_TRUNCATE_CHARS],
                     )
 
             return Outcome(

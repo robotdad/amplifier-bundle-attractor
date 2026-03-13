@@ -140,7 +140,13 @@ class TestIterationParse:
     ]
 
     def test_all_required_node_ids_present(self):
-        """All 13 required node IDs are present."""
+        """All 13 required node IDs are present.
+
+        Intentionally overlaps with test_each_required_node_id[*] below:
+        this bulk test catches the complete set in one assertion, while the
+        parametrized variant gives per-node visibility in CI output so a
+        failure names exactly which node is missing.
+        """
         graph = _graph()
         missing = [nid for nid in self.REQUIRED_NODE_IDS if nid not in graph.nodes]
         assert not missing, (
@@ -149,7 +155,7 @@ class TestIterationParse:
 
     @pytest.mark.parametrize("node_id", REQUIRED_NODE_IDS)
     def test_each_required_node_id(self, node_id):
-        """Each required node ID is individually present."""
+        """Each required node ID is individually present (per-node CI visibility)."""
         graph = _graph()
         assert node_id in graph.nodes, (
             f"Node '{node_id}' not found. Present: {list(graph.nodes.keys())}"
@@ -211,7 +217,7 @@ class TestIterationParse:
         """test_preflight does NOT have continue_on_fail (it is a hard gate)."""
         graph = _graph()
         val = graph.nodes["test_preflight"].attrs.get("continue_on_fail")
-        assert val is None or val != "true", (
+        assert val != "true", (
             f"test_preflight should NOT have continue_on_fail='true', got {val!r}"
         )
 

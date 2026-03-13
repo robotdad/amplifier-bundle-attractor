@@ -42,7 +42,9 @@ _ADMISSIONS_DOT = os.path.join(
 )
 
 
-def _graph():
+@pytest.fixture(scope="class")
+def admissions_graph():
+    """Parse admissions.dot once per test class run."""
     with open(_ADMISSIONS_DOT) as f:
         return parse_dot(f.read())
 
@@ -69,48 +71,47 @@ class TestAdmissionsParse:
     # AC-2: Parses without error
     # -----------------------------------------------------------------------
 
-    def test_parses_without_error(self):
+    def test_parses_without_error(self, admissions_graph):
         """admissions.dot parses without raising exceptions."""
-        graph = _graph()
-        assert graph is not None
+        assert admissions_graph is not None
 
     # -----------------------------------------------------------------------
     # AC-3: Exactly 10 nodes (spec description actually yields 11)
     # -----------------------------------------------------------------------
 
-    def test_has_eleven_nodes(self):
+    def test_has_eleven_nodes(self, admissions_graph):
         """Exactly 11 nodes: start, gate1-5, compile_assessment, verdict_gate, 3 done terminals.
 
         Note: the spec description lists 11 distinct node elements
         (start + 5 gates + compile_assessment + verdict_gate + 3 terminals = 11).
         """
-        graph = _graph()
-        assert len(graph.nodes) == 11, (
-            f"Expected 11 nodes, got {len(graph.nodes)}: {list(graph.nodes.keys())}"
+        assert len(admissions_graph.nodes) == 11, (
+            f"Expected 11 nodes, got {len(admissions_graph.nodes)}: "
+            f"{list(admissions_graph.nodes.keys())}"
         )
 
     # -----------------------------------------------------------------------
     # AC-4: start node exists with Mdiamond shape
     # -----------------------------------------------------------------------
 
-    def test_has_start_node(self):
+    def test_has_start_node(self, admissions_graph):
         """start node exists with shape=Mdiamond."""
-        graph = _graph()
-        assert "start" in graph.nodes, (
-            f"Node 'start' not found. Nodes: {list(graph.nodes.keys())}"
+        assert "start" in admissions_graph.nodes, (
+            f"Node 'start' not found. Nodes: {list(admissions_graph.nodes.keys())}"
         )
-        assert graph.nodes["start"].shape == "Mdiamond", (
-            f"Expected start shape=Mdiamond, got {graph.nodes['start'].shape!r}"
+        assert admissions_graph.nodes["start"].shape == "Mdiamond", (
+            f"Expected start shape=Mdiamond, got {admissions_graph.nodes['start'].shape!r}"
         )
 
     # -----------------------------------------------------------------------
     # AC-5: Exactly 5 folder nodes
     # -----------------------------------------------------------------------
 
-    def test_has_five_folder_nodes(self):
+    def test_has_five_folder_nodes(self, admissions_graph):
         """Exactly 5 folder nodes (gate1-gate5)."""
-        graph = _graph()
-        folder_nodes = [n for n in graph.nodes.values() if n.shape == "folder"]
+        folder_nodes = [
+            n for n in admissions_graph.nodes.values() if n.shape == "folder"
+        ]
         assert len(folder_nodes) == 5, (
             f"Expected 5 folder nodes, got {len(folder_nodes)}: "
             f"{[n.id for n in folder_nodes]}"
@@ -120,10 +121,11 @@ class TestAdmissionsParse:
     # AC-6: All folder nodes reference conversational-gate.dot
     # -----------------------------------------------------------------------
 
-    def test_folder_nodes_reference_conversational_gate(self):
+    def test_folder_nodes_reference_conversational_gate(self, admissions_graph):
         """All folder nodes reference ../../patterns/conversational-gate.dot."""
-        graph = _graph()
-        folder_nodes = [n for n in graph.nodes.values() if n.shape == "folder"]
+        folder_nodes = [
+            n for n in admissions_graph.nodes.values() if n.shape == "folder"
+        ]
         for node in folder_nodes:
             dot_file = node.attrs.get("dot_file", "")
             assert "conversational-gate.dot" in dot_file, (
@@ -135,10 +137,11 @@ class TestAdmissionsParse:
     # AC-7: Each folder node has all three context attrs
     # -----------------------------------------------------------------------
 
-    def test_folder_nodes_have_all_three_context_attrs(self):
+    def test_folder_nodes_have_all_three_context_attrs(self, admissions_graph):
         """Each folder node has context.gate_topic, context.gate_criteria, context.gate_output_path."""
-        graph = _graph()
-        folder_nodes = [n for n in graph.nodes.values() if n.shape == "folder"]
+        folder_nodes = [
+            n for n in admissions_graph.nodes.values() if n.shape == "folder"
+        ]
         for node in folder_nodes:
             assert "context.gate_topic" in node.attrs, (
                 f"Node {node.id!r} missing context.gate_topic attr"
@@ -154,10 +157,11 @@ class TestAdmissionsParse:
     # AC-8: Gate output paths are unique
     # -----------------------------------------------------------------------
 
-    def test_gate_output_paths_are_unique(self):
+    def test_gate_output_paths_are_unique(self, admissions_graph):
         """Each gate has a unique context.gate_output_path."""
-        graph = _graph()
-        folder_nodes = [n for n in graph.nodes.values() if n.shape == "folder"]
+        folder_nodes = [
+            n for n in admissions_graph.nodes.values() if n.shape == "folder"
+        ]
         paths = [
             node.attrs.get("context.gate_output_path", "") for node in folder_nodes
         ]
@@ -173,10 +177,11 @@ class TestAdmissionsParse:
         "keyword",
         ["DECOMPOSABILITY", "CORRECTNESS", "ARCHITECTURE", "TOOLCHAIN", "SPEC"],
     )
-    def test_gate_topics_contain_keyword(self, keyword: str):
+    def test_gate_topics_contain_keyword(self, admissions_graph, keyword: str):
         """At least one gate topic contains the expected keyword."""
-        graph = _graph()
-        folder_nodes = [n for n in graph.nodes.values() if n.shape == "folder"]
+        folder_nodes = [
+            n for n in admissions_graph.nodes.values() if n.shape == "folder"
+        ]
         topics = [node.attrs.get("context.gate_topic", "") for node in folder_nodes]
         assert any(keyword in t for t in topics), (
             f"Expected {keyword} in a gate topic. Topics: {topics}"
@@ -186,10 +191,11 @@ class TestAdmissionsParse:
     # AC-14: Gate criteria contain scoring thresholds
     # -----------------------------------------------------------------------
 
-    def test_gate_criteria_contain_scoring_thresholds(self):
+    def test_gate_criteria_contain_scoring_thresholds(self, admissions_graph):
         """Gate criteria contain scoring thresholds (75% and 50%)."""
-        graph = _graph()
-        folder_nodes = [n for n in graph.nodes.values() if n.shape == "folder"]
+        folder_nodes = [
+            n for n in admissions_graph.nodes.values() if n.shape == "folder"
+        ]
         all_criteria = " ".join(
             node.attrs.get("context.gate_criteria", "") for node in folder_nodes
         )
@@ -206,13 +212,13 @@ class TestAdmissionsParse:
     # AC-15: compile_assessment is a codergen node (box/default shape)
     # -----------------------------------------------------------------------
 
-    def test_has_compile_assessment_codergen_node(self):
+    def test_has_compile_assessment_codergen_node(self, admissions_graph):
         """compile_assessment node exists with codergen (box/default) shape."""
-        graph = _graph()
-        assert "compile_assessment" in graph.nodes, (
-            f"Node 'compile_assessment' not found. Nodes: {list(graph.nodes.keys())}"
+        assert "compile_assessment" in admissions_graph.nodes, (
+            f"Node 'compile_assessment' not found. "
+            f"Nodes: {list(admissions_graph.nodes.keys())}"
         )
-        node = graph.nodes["compile_assessment"]
+        node = admissions_graph.nodes["compile_assessment"]
         # codergen nodes have box or default (empty/None) shape
         assert node.shape in ("box", "rectangle", None, ""), (
             f"Expected compile_assessment to be a codergen (box/default) node, "
@@ -223,15 +229,14 @@ class TestAdmissionsParse:
     # AC-16: compile_assessment prompt references all 5 gate output files
     # -----------------------------------------------------------------------
 
-    def test_compile_assessment_prompt_contains_gate_files(self):
+    def test_compile_assessment_prompt_contains_gate_files(self, admissions_graph):
         """compile_assessment prompt references all 5 gate output files."""
-        graph = _graph()
-        node = graph.nodes.get("compile_assessment")
+        node = admissions_graph.nodes.get("compile_assessment")
         assert node is not None, "compile_assessment node not found"
         prompt = node.prompt or ""
         for i in range(1, 6):
-            assert f"gate{i}" in prompt, (
-                f"Expected reference to gate{i} file in compile_assessment prompt. "
+            assert f".ai/gate{i}_" in prompt, (
+                f"Expected reference to .ai/gate{i}_*.md in compile_assessment prompt. "
                 f"Prompt (first 400 chars): {prompt[:400]}"
             )
 
@@ -239,10 +244,9 @@ class TestAdmissionsParse:
     # AC-17: compile_assessment prompt contains threshold rules
     # -----------------------------------------------------------------------
 
-    def test_compile_assessment_prompt_contains_threshold_rules(self):
+    def test_compile_assessment_prompt_contains_threshold_rules(self, admissions_graph):
         """compile_assessment prompt contains scoring threshold rules (50%, 75%)."""
-        graph = _graph()
-        node = graph.nodes.get("compile_assessment")
+        node = admissions_graph.nodes.get("compile_assessment")
         assert node is not None, "compile_assessment node not found"
         prompt = node.prompt or ""
         assert "50" in prompt, (
@@ -258,10 +262,11 @@ class TestAdmissionsParse:
     # AC-18: compile_assessment prompt mentions .dev-machine-assessment.md
     # -----------------------------------------------------------------------
 
-    def test_compile_assessment_prompt_mentions_dev_machine_assessment(self):
+    def test_compile_assessment_prompt_mentions_dev_machine_assessment(
+        self, admissions_graph
+    ):
         """compile_assessment prompt mentions .dev-machine-assessment.md."""
-        graph = _graph()
-        node = graph.nodes.get("compile_assessment")
+        node = admissions_graph.nodes.get("compile_assessment")
         assert node is not None, "compile_assessment node not found"
         prompt = node.prompt or ""
         assert ".dev-machine-assessment.md" in prompt, (
@@ -273,10 +278,9 @@ class TestAdmissionsParse:
     # AC-19: compile_assessment prompt mentions preferred_label
     # -----------------------------------------------------------------------
 
-    def test_compile_assessment_prompt_mentions_preferred_label(self):
+    def test_compile_assessment_prompt_mentions_preferred_label(self, admissions_graph):
         """compile_assessment prompt mentions preferred_label routing instruction."""
-        graph = _graph()
-        node = graph.nodes.get("compile_assessment")
+        node = admissions_graph.nodes.get("compile_assessment")
         assert node is not None, "compile_assessment node not found"
         prompt = node.prompt or ""
         assert "preferred_label" in prompt, (
@@ -288,25 +292,26 @@ class TestAdmissionsParse:
     # AC-20: verdict_gate has diamond shape
     # -----------------------------------------------------------------------
 
-    def test_has_verdict_diamond(self):
+    def test_has_verdict_diamond(self, admissions_graph):
         """verdict_gate node exists with shape=diamond."""
-        graph = _graph()
-        assert "verdict_gate" in graph.nodes, (
-            f"Node 'verdict_gate' not found. Nodes: {list(graph.nodes.keys())}"
+        assert "verdict_gate" in admissions_graph.nodes, (
+            f"Node 'verdict_gate' not found. "
+            f"Nodes: {list(admissions_graph.nodes.keys())}"
         )
-        assert graph.nodes["verdict_gate"].shape == "diamond", (
+        assert admissions_graph.nodes["verdict_gate"].shape == "diamond", (
             f"Expected verdict_gate shape=diamond, "
-            f"got {graph.nodes['verdict_gate'].shape!r}"
+            f"got {admissions_graph.nodes['verdict_gate'].shape!r}"
         )
 
     # -----------------------------------------------------------------------
     # AC-21: Exactly 3 terminal (Msquare) nodes
     # -----------------------------------------------------------------------
 
-    def test_has_three_terminal_nodes(self):
+    def test_has_three_terminal_nodes(self, admissions_graph):
         """Exactly 3 Msquare terminal nodes (done_proceed, done_caution, done_not_ready)."""
-        graph = _graph()
-        terminal_nodes = [n for n in graph.nodes.values() if n.shape == "Msquare"]
+        terminal_nodes = [
+            n for n in admissions_graph.nodes.values() if n.shape == "Msquare"
+        ]
         assert len(terminal_nodes) == 3, (
             f"Expected 3 Msquare terminal nodes, got {len(terminal_nodes)}: "
             f"{[n.id for n in terminal_nodes]}"
@@ -316,10 +321,11 @@ class TestAdmissionsParse:
     # AC-22: verdict_gate has 3 conditional outgoing edges
     # -----------------------------------------------------------------------
 
-    def test_verdict_gate_has_three_conditional_edges(self):
+    def test_verdict_gate_has_three_conditional_edges(self, admissions_graph):
         """verdict_gate has exactly 3 conditional outgoing edges."""
-        graph = _graph()
-        verdict_edges = [e for e in graph.edges if e.from_node == "verdict_gate"]
+        verdict_edges = [
+            e for e in admissions_graph.edges if e.from_node == "verdict_gate"
+        ]
         assert len(verdict_edges) == 3, (
             f"Expected 3 edges from verdict_gate, got {len(verdict_edges)}: "
             f"{[(e.to_node, e.label) for e in verdict_edges]}"
@@ -334,10 +340,11 @@ class TestAdmissionsParse:
     # AC-23: verdict conditions cover proceed, caution, not_ready
     # -----------------------------------------------------------------------
 
-    def test_verdict_conditions_cover_all_verdicts(self):
+    def test_verdict_conditions_cover_all_verdicts(self, admissions_graph):
         """verdict_gate edges cover proceed, caution, and not_ready conditions."""
-        graph = _graph()
-        verdict_edges = [e for e in graph.edges if e.from_node == "verdict_gate"]
+        verdict_edges = [
+            e for e in admissions_graph.edges if e.from_node == "verdict_gate"
+        ]
         labels = {e.label for e in verdict_edges}
         assert "proceed" in labels, (
             f"Expected 'proceed' label in verdict_gate edges, got {labels}"
@@ -353,12 +360,11 @@ class TestAdmissionsParse:
     # AC-24: Sequential flow start -> gate1 -> ... -> verdict_gate
     # -----------------------------------------------------------------------
 
-    def test_sequential_flow_start_to_verdict(self):
+    def test_sequential_flow_start_to_verdict(self, admissions_graph):
         """Sequential 8-node chain: start->gate1->gate2->gate3->gate4->gate5->compile_assessment->verdict_gate."""
-        graph = _graph()
         # Build edge map: from_node -> list of to_nodes
         edge_map: dict[str, list[str]] = {}
-        for e in graph.edges:
+        for e in admissions_graph.edges:
             edge_map.setdefault(e.from_node, []).append(e.to_node)
 
         # Walk the chain starting from 'start' (7 hops to reach verdict_gate)
@@ -368,8 +374,14 @@ class TestAdmissionsParse:
             next_nodes = edge_map.get(current, [])
             if not next_nodes:
                 break
-            # For sequential nodes (start, gate1-5, compile_assessment),
-            # there is exactly one outgoing edge; we stop before verdict_gate's 3 edges
+            # Every node in this sequential chain should have exactly one outgoing
+            # edge; if a node gains a second edge (e.g. an error bypass), this
+            # assertion will catch the assumption before the wrong path is silently
+            # traversed.
+            assert len(next_nodes) == 1, (
+                f"Sequential node '{current}' should have exactly 1 outgoing edge, "
+                f"got {len(next_nodes)}: {next_nodes}"
+            )
             current = next_nodes[0]
             chain.append(current)
 

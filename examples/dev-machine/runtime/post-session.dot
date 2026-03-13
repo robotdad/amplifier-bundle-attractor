@@ -1,0 +1,102 @@
+// post-session.dot -- Decomposed Post-Session Sub-Pipeline
+//
+// Decomposes the post-session bash monolith into 5 sequential tool steps.
+// Called as a sub-pipeline from iteration.dot after the build check completes.
+//
+// Steps:
+//   1. archive_features   -- archive completed features to history (critical)
+//   2. session_accounting -- update session counters and metrics (critical)
+//   3. reconcile          -- reconcile state files (housekeeping, non-critical)
+//   4. periodic_check     -- run periodic maintenance tasks (housekeeping, non-critical)
+//   5. status_output      -- emit pipeline status summary (parse_json)
+//
+// 7 nodes, 6 edges. Linear chain, no branching.
+// archive_features and session_accounting are critical (no continue_on_fail).
+// reconcile and periodic_check use continue_on_fail (housekeeping, not session-critical).
+// status_output has parse_json='true'.
+
+digraph PostSession {
+    graph [label="Dev Machine Post-Session Sub-Pipeline"]
+    rankdir=TB
+
+    // -----------------------------------------------------------------------
+    // Structural nodes
+    // -----------------------------------------------------------------------
+
+    start [shape=Mdiamond, label="Start"]
+    done  [shape=Msquare,  label="Done"]
+
+    // -----------------------------------------------------------------------
+    // Step 1: Archive features
+    // Archives completed features to session history.
+    // Critical step: no continue_on_fail (failure must halt post-session).
+    // -----------------------------------------------------------------------
+
+    archive_features [
+        shape=parallelogram,
+        label="Archive Features",
+        tool_command="python3 scripts/pipeline/post-session-archive.py $state_file $context_file $max_features_per_session"
+    ]
+
+    // -----------------------------------------------------------------------
+    // Step 2: Session accounting
+    // Updates session counters, epoch tracking, and usage metrics.
+    // Critical step: no continue_on_fail (failure must halt post-session).
+    // -----------------------------------------------------------------------
+
+    session_accounting [
+        shape=parallelogram,
+        label="Session Accounting",
+        tool_command="python3 scripts/pipeline/post-session-accounting.py $state_file"
+    ]
+
+    // -----------------------------------------------------------------------
+    // Step 3: Reconcile
+    // Reconciles state files and cleans up transient artifacts.
+    // Housekeeping: continue_on_fail so reconcile errors cannot block the loop.
+    // -----------------------------------------------------------------------
+
+    reconcile [
+        shape=parallelogram,
+        label="Reconcile",
+        tool_command="python3 scripts/pipeline/post-session-reconcile.py $state_file $context_file",
+        continue_on_fail="true"
+    ]
+
+    // -----------------------------------------------------------------------
+    // Step 4: Periodic check
+    // Runs periodic maintenance: spec freshness, dependency audits, etc.
+    // Housekeeping: continue_on_fail so periodic tasks cannot block the loop.
+    // -----------------------------------------------------------------------
+
+    periodic_check [
+        shape=parallelogram,
+        label="Periodic Check",
+        tool_command="python3 scripts/pipeline/post-session-periodic.py $state_file $project_dir",
+        continue_on_fail="true"
+    ]
+
+    // -----------------------------------------------------------------------
+    // Step 5: Status output
+    // Emits a structured JSON summary of the completed session.
+    // parse_json='true' injects status fields into pipeline context.
+    // -----------------------------------------------------------------------
+
+    status_output [
+        shape=parallelogram,
+        label="Status Output",
+        tool_command="python3 scripts/pipeline/post-session-status.py $state_file",
+        parse_json="true"
+    ]
+
+    // -----------------------------------------------------------------------
+    // Edges (6 total) -- linear chain, no branching
+    // -----------------------------------------------------------------------
+
+    start              -> archive_features
+    archive_features   -> session_accounting
+    session_accounting -> reconcile
+    reconcile          -> periodic_check
+    periodic_check     -> status_output
+    status_output      -> done
+}

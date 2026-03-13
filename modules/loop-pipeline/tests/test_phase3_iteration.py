@@ -510,3 +510,209 @@ class TestIterationParse:
                 f"Expected all build_gate edges to route to post_session, "
                 f"but {e.from_node} -> {e.to_node} (label={e.label!r})"
             )
+
+
+# ===========================================================================
+# TestPostSessionParse -- post-session.dot structural tests
+# ===========================================================================
+
+_POST_SESSION_DOT = os.path.join(
+    _EXAMPLES_DIR, "dev-machine", "runtime", "post-session.dot"
+)
+
+
+def _load_post_session() -> str:
+    with open(_POST_SESSION_DOT) as f:
+        return f.read()
+
+
+def _graph_post_session():
+    return parse_dot(_load_post_session())
+
+
+class TestPostSessionParse:
+    """Tests for post-session.dot parse correctness and structural requirements."""
+
+    # -----------------------------------------------------------------------
+    # AC-1: File exists
+    # -----------------------------------------------------------------------
+
+    def test_file_exists(self):
+        """post-session.dot exists at examples/dev-machine/runtime/post-session.dot."""
+        assert os.path.isfile(_POST_SESSION_DOT), (
+            f"post-session.dot not found at {_POST_SESSION_DOT}"
+        )
+
+    # -----------------------------------------------------------------------
+    # AC-2: Parses without error
+    # -----------------------------------------------------------------------
+
+    def test_parses_without_error(self):
+        """post-session.dot parses without raising exceptions."""
+        graph = _graph_post_session()
+        assert graph is not None
+
+    # -----------------------------------------------------------------------
+    # AC-3: Exactly 7 nodes
+    # -----------------------------------------------------------------------
+
+    def test_node_count(self):
+        """Exactly 7 nodes."""
+        graph = _graph_post_session()
+        assert len(graph.nodes) == 7, (
+            f"Expected 7 nodes, got {len(graph.nodes)}: {list(graph.nodes.keys())}"
+        )
+
+    # -----------------------------------------------------------------------
+    # AC-4: Exactly 5 parallelogram nodes
+    # -----------------------------------------------------------------------
+
+    def test_parallelogram_count(self):
+        """Exactly 5 parallelogram (tool) nodes."""
+        graph = _graph_post_session()
+        count = sum(1 for n in graph.nodes.values() if n.shape == "parallelogram")
+        assert count == 5, f"Expected 5 parallelogram nodes, got {count}"
+
+    # -----------------------------------------------------------------------
+    # AC-5: All 7 required node IDs present
+    # -----------------------------------------------------------------------
+
+    REQUIRED_NODE_IDS = [
+        "start",
+        "archive_features",
+        "session_accounting",
+        "reconcile",
+        "periodic_check",
+        "status_output",
+        "done",
+    ]
+
+    def test_all_required_node_ids_present(self):
+        """All 7 required node IDs are present."""
+        graph = _graph_post_session()
+        missing = [nid for nid in self.REQUIRED_NODE_IDS if nid not in graph.nodes]
+        assert not missing, (
+            f"Missing node IDs: {missing}. Present: {list(graph.nodes.keys())}"
+        )
+
+    @pytest.mark.parametrize("node_id", REQUIRED_NODE_IDS)
+    def test_each_required_node_id(self, node_id):
+        """Each required node ID is individually present (per-node CI visibility)."""
+        graph = _graph_post_session()
+        assert node_id in graph.nodes, (
+            f"Node '{node_id}' not found. Present: {list(graph.nodes.keys())}"
+        )
+
+    # -----------------------------------------------------------------------
+    # AC-6: reconcile and periodic_check have continue_on_fail='true'
+    # -----------------------------------------------------------------------
+
+    @pytest.mark.parametrize("node_id", ["reconcile", "periodic_check"])
+    def test_continue_on_fail_nodes(self, node_id):
+        """reconcile and periodic_check have continue_on_fail='true'."""
+        graph = _graph_post_session()
+        val = graph.nodes[node_id].attrs.get("continue_on_fail")
+        assert val == "true", f"Expected {node_id} continue_on_fail='true', got {val!r}"
+
+    @pytest.mark.parametrize("node_id", ["reconcile", "periodic_check"])
+    def test_continue_on_fail_nodes_are_parallelogram(self, node_id):
+        """reconcile and periodic_check have shape=parallelogram."""
+        graph = _graph_post_session()
+        assert graph.nodes[node_id].shape == "parallelogram", (
+            f"Expected {node_id} shape=parallelogram, "
+            f"got {graph.nodes[node_id].shape!r}"
+        )
+
+    # -----------------------------------------------------------------------
+    # AC-7: archive_features and session_accounting do NOT have continue_on_fail
+    # -----------------------------------------------------------------------
+
+    @pytest.mark.parametrize("node_id", ["archive_features", "session_accounting"])
+    def test_critical_nodes_no_continue_on_fail(self, node_id):
+        """archive_features and session_accounting do NOT have continue_on_fail."""
+        graph = _graph_post_session()
+        val = graph.nodes[node_id].attrs.get("continue_on_fail")
+        assert val != "true", (
+            f"{node_id} should NOT have continue_on_fail='true', got {val!r}"
+        )
+
+    @pytest.mark.parametrize("node_id", ["archive_features", "session_accounting"])
+    def test_critical_nodes_are_parallelogram(self, node_id):
+        """archive_features and session_accounting have shape=parallelogram."""
+        graph = _graph_post_session()
+        assert graph.nodes[node_id].shape == "parallelogram", (
+            f"Expected {node_id} shape=parallelogram, "
+            f"got {graph.nodes[node_id].shape!r}"
+        )
+
+    # -----------------------------------------------------------------------
+    # AC-8: status_output has parse_json='true'
+    # -----------------------------------------------------------------------
+
+    def test_status_output_parse_json(self):
+        """status_output has parse_json='true'."""
+        graph = _graph_post_session()
+        val = graph.nodes["status_output"].attrs.get("parse_json")
+        assert val == "true", f"Expected status_output parse_json='true', got {val!r}"
+
+    def test_status_output_shape(self):
+        """status_output has shape=parallelogram."""
+        graph = _graph_post_session()
+        assert graph.nodes["status_output"].shape == "parallelogram", (
+            f"Expected status_output shape=parallelogram, "
+            f"got {graph.nodes['status_output'].shape!r}"
+        )
+
+    def test_status_output_no_continue_on_fail(self):
+        """status_output does NOT have continue_on_fail."""
+        graph = _graph_post_session()
+        val = graph.nodes["status_output"].attrs.get("continue_on_fail")
+        assert val != "true", (
+            f"status_output should NOT have continue_on_fail='true', got {val!r}"
+        )
+
+    # -----------------------------------------------------------------------
+    # AC-9: Exactly 6 edges (linear chain)
+    # -----------------------------------------------------------------------
+
+    def test_edge_count(self):
+        """Exactly 6 edges."""
+        graph = _graph_post_session()
+        assert len(graph.edges) == 6, (
+            f"Expected 6 edges, got {len(graph.edges)}: "
+            + "\n".join(f"  {e.from_node} -> {e.to_node}" for e in graph.edges)
+        )
+
+    # -----------------------------------------------------------------------
+    # AC-10: Chain order verified
+    #   start -> archive_features -> session_accounting -> reconcile
+    #   -> periodic_check -> status_output -> done
+    # -----------------------------------------------------------------------
+
+    EXPECTED_CHAIN = [
+        ("start", "archive_features"),
+        ("archive_features", "session_accounting"),
+        ("session_accounting", "reconcile"),
+        ("reconcile", "periodic_check"),
+        ("periodic_check", "status_output"),
+        ("status_output", "done"),
+    ]
+
+    def test_linear_chain_edges(self):
+        """All 6 edges form the expected linear chain."""
+        graph = _graph_post_session()
+        edge_pairs = {(e.from_node, e.to_node) for e in graph.edges}
+        missing = [pair for pair in self.EXPECTED_CHAIN if pair not in edge_pairs]
+        assert not missing, (
+            f"Missing edges: {missing}. Present edges: {sorted(edge_pairs)}"
+        )
+
+    @pytest.mark.parametrize("from_node,to_node", EXPECTED_CHAIN)
+    def test_each_chain_edge(self, from_node, to_node):
+        """Each link in the chain is individually present (per-edge CI visibility)."""
+        graph = _graph_post_session()
+        edge_pairs = {(e.from_node, e.to_node) for e in graph.edges}
+        assert (from_node, to_node) in edge_pairs, (
+            f"Edge {from_node} -> {to_node} not found. "
+            f"Present edges: {sorted(edge_pairs)}"
+        )

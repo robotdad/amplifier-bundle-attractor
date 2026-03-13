@@ -1,0 +1,249 @@
+// iteration.dot -- The Core 8-Step Pipeline
+//
+// Translates dev-machine-iteration.yaml into a DOT pipeline.
+// Single iteration of the development machine loop:
+//   1. Orient (read STATE.yaml, parse_json)
+//   2. Gate on blocked/healthy status
+//   3. Spec drift check (non-blocking)
+//   4. API inventory (non-blocking)
+//   5. Test environment preflight (hard gate)
+//   6. Gate on test_env broken/ok
+//   7. Module health check (non-blocking)
+//   8. Working session (LLM agent, safety-constrained)
+//   9. Build check (parse_json)
+//  10. Build gate (routes both clean and failed to post_session)
+//  11. Post-session sub-pipeline (loop back to start)
+//
+// 13 nodes, 15 edges.
+// Context variables: $state_file, $context_file, $specs_dir, $project_dir,
+//   $architecture_spec, $test_command, $build_command, $commit_prefix,
+//   $max_features_per_session, $module_size_threshold, $session_timeout,
+//   $build_timeout
+
+digraph Iteration {
+    graph [label="Dev Machine Iteration Pipeline"]
+    rankdir=TB
+
+    // -----------------------------------------------------------------------
+    // Structural nodes
+    // -----------------------------------------------------------------------
+
+    start [shape=Mdiamond, label="Start"]
+    done  [shape=Msquare,  label="Done"]
+
+    // -----------------------------------------------------------------------
+    // Step 1: Orient -- read STATE.yaml before dispatching the working session
+    // Runs the orient script, parses JSON output to get status/phase/epoch.
+    // -----------------------------------------------------------------------
+
+    orient [
+        shape=parallelogram,
+        label="Orient",
+        tool_command="python3 scripts/pipeline/orient.py $state_file",
+        parse_json="true"
+    ]
+
+    orient_gate [
+        shape=diamond,
+        label="Blocked?"
+    ]
+
+    // -----------------------------------------------------------------------
+    // Step 2: Spec drift check
+    // Compares spec file mtimes against implementation file mtimes.
+    // Non-blocking: continue_on_fail so missing tooling cannot halt work.
+    // -----------------------------------------------------------------------
+
+    spec_drift [
+        shape=parallelogram,
+        label="Spec Drift Check",
+        tool_command="python3 scripts/pipeline/spec-drift-check.py $project_dir $specs_dir",
+        continue_on_fail="true"
+    ]
+
+    // -----------------------------------------------------------------------
+    // Step 3: API inventory
+    // Scans project source for public types/APIs, writes to SCRATCH.md.
+    // Non-blocking: feeds Platform Grounding but must not block work.
+    // -----------------------------------------------------------------------
+
+    api_inventory [
+        shape=parallelogram,
+        label="API Inventory",
+        tool_command="python3 scripts/pipeline/api-inventory.py $project_dir",
+        continue_on_fail="true"
+    ]
+
+    // -----------------------------------------------------------------------
+    // Step 4: Test environment preflight -- HARD GATE (no continue_on_fail)
+    // Validates the test runner itself works before wasting a working session.
+    // If the runner is broken, write postmortem + sentinel, route to done.
+    // -----------------------------------------------------------------------
+
+    test_preflight [
+        shape=parallelogram,
+        label="Test Preflight",
+        tool_command="python3 scripts/pipeline/test-env-preflight.py $project_dir $test_command",
+        parse_json="true"
+    ]
+
+    test_preflight_gate [
+        shape=diamond,
+        label="Test Env OK?"
+    ]
+
+    // -----------------------------------------------------------------------
+    // Step 5: Module health check
+    // Flags oversized packages before working session. Non-blocking.
+    // Content-aware bypass: modules already in next_action are warned, not blocked.
+    // -----------------------------------------------------------------------
+
+    module_health [
+        shape=parallelogram,
+        label="Module Health",
+        tool_command="python3 scripts/pipeline/module-health-check.py $project_dir $state_file $module_size_threshold",
+        continue_on_fail="true"
+    ]
+
+    // -----------------------------------------------------------------------
+    // Step 6: Working session -- the core LLM work step
+    // Dispatches a fresh agent with zero prior context.
+    // context_fidelity=truncate keeps token budget manageable.
+    // VERBATIM safety-constrained prompt below.
+    // -----------------------------------------------------------------------
+
+    working_session [
+        shape=box,
+        context_fidelity="truncate",
+        label="Working Session",
+        prompt="You are a WORKING SESSION of the development machine.
+You start with ZERO prior context. Your job: read state, do work, persist state, exit.
+
+START BY READING THESE FILES (in this order):
+1. $state_file -- current phase, what's done, what's next
+2. $context_file -- recent decisions and handoff context
+3. .dev-machine/working-session-instructions.md -- your detailed operating procedure
+
+THEN READ THE RELEVANT SPECS:
+4. $architecture_spec -- the overall architecture (always read this)
+5. Module specs for whatever module you're working on (check $state_file module_specs)
+6. Feature specs marked 'ready' in $state_file features section
+
+## Platform Grounding (MANDATORY before writing any code)
+
+Before writing ANY code that uses project-internal APIs, types, or interfaces:
+1. Enumerate actual types/interfaces: Read source files to find what actually exists.
+   For each module you're working in, grep or read for: interface, type, class,
+   export type, export function, def, pub struct, pub fn.
+   DO NOT rely on training data -- read what is actually there.
+2. Map each requirement to an existing type: For each feature requirement, identify
+   the actual type/API you will call. Write this mapping as a comment before coding.
+3. If a required type does not exist: create it before using it.
+
+### Hallucinating APIs is the #1 failure mode
+If you write code that calls a function/type/method that does not exist in the
+codebase, the build will fail and the session will be wasted. Always read first.
+
+## SAFETY CONSTRAINTS
+
+### FORBIDDEN commands
+The following commands are ABSOLUTELY FORBIDDEN in this session:
+- rm -rf / or any recursive delete of system directories
+- DROP TABLE, DROP DATABASE, or any destructive database commands on production
+- Any command that modifies files outside $project_dir without explicit instruction
+- git push --force or git reset --hard on shared branches
+- Any command that disables security controls or authentication
+- Deleting $state_file, $context_file, or any .dev-machine/ configuration files
+
+### VIOLATION OF THESE CONSTRAINTS MAY CAUSE DATA LOSS
+If you are ever uncertain whether a command violates these constraints, DO NOT
+run it. Instead, write a note in $state_file under 'blockers' describing what
+you need a human to approve.
+
+## Working Guidelines
+
+After reading the state and specs, identify the highest-priority ready feature
+from $state_file. Implement it following the TDD discipline described in the
+working-session-instructions.md. Commit your work with the prefix $commit_prefix.
+
+Update $state_file when you complete a feature: mark it 'completed' and write
+a brief summary in the next_action field for the next session.
+
+Maximum features per session: $max_features_per_session.
+Session timeout: $session_timeout -- stop and persist state before this limit."
+    ]
+
+    // -----------------------------------------------------------------------
+    // Step 7: Build check
+    // Runs the build command, parses JSON output for structured status.
+    // parse_json injects build_status into context for build_gate routing.
+    // -----------------------------------------------------------------------
+
+    build_check [
+        shape=parallelogram,
+        label="Build Check",
+        tool_command="python3 scripts/pipeline/build-check.py $project_dir $build_command $build_timeout",
+        parse_json="true"
+    ]
+
+    build_gate [
+        shape=diamond,
+        label="Build OK?"
+    ]
+
+    // -----------------------------------------------------------------------
+    // Step 8: Post-session sub-pipeline
+    // Delegates to post-session.dot for archiving, accounting, reconcile, status.
+    // After post-session completes, loops back to start for the next iteration.
+    // -----------------------------------------------------------------------
+
+    post_session [
+        shape=folder,
+        label="Post Session",
+        dot_file="post-session.dot"
+    ]
+
+    // -----------------------------------------------------------------------
+    // Edges (15 total)
+    // -----------------------------------------------------------------------
+
+    // Entry
+    start -> orient
+
+    // Orient produces context.status = blocked|healthy
+    orient -> orient_gate
+
+    // Gate: blocked sessions route to done (outer loop decides whether to retry)
+    orient_gate -> done        [label="blocked", condition="context.status=blocked"]
+    // Gate: healthy sessions proceed to spec drift check
+    orient_gate -> spec_drift  [label="healthy", condition="context.status=healthy"]
+
+    // Non-blocking preparation steps (continue_on_fail on each node)
+    spec_drift    -> api_inventory
+    api_inventory -> test_preflight
+
+    // Test preflight produces context.test_env = ok|broken
+    test_preflight -> test_preflight_gate
+
+    // Hard gate: broken test runner routes to done (avoids wasting working session)
+    test_preflight_gate -> done          [label="broken", condition="context.test_env=broken"]
+    // OK: proceed to module health check
+    test_preflight_gate -> module_health [label="ok",     condition="context.test_env=ok"]
+
+    // Module health check then working session
+    module_health   -> working_session
+
+    // Working session then build check
+    working_session -> build_check
+
+    // Build check produces context.build_status = clean|failed
+    build_check -> build_gate
+
+    // Build gate: BOTH clean and failed route to post_session
+    // (post-session handles failure accounting, archiving, and state update)
+    build_gate -> post_session [label="clean",  condition="context.build_status=clean"]
+    build_gate -> post_session [label="failed", condition="context.build_status=failed"]
+
+    // Post-session loops back to start for the next iteration
+    post_session -> start
+}

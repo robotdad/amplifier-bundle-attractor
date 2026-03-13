@@ -45,7 +45,7 @@ digraph FixIteration {
     // Dispatches a fresh agent with safety-constrained prompt.
     // context_fidelity=truncate keeps token budget manageable.
     // VERBATIM prompt from dev-machine-fix-iteration.yaml fix-session step
-    // with {{variable}} -> $variable adaptation.
+    // with template variable tokens adapted to $variable notation.
     // -----------------------------------------------------------------------
 
     fix_session [

@@ -169,6 +169,10 @@ working-session-instructions.md. Commit your work with the prefix $commit_prefix
 Update $state_file when you complete a feature: mark it 'completed' and write
 a brief summary in the next_action field for the next session.
 
+What you don't write down is lost forever -- this session's context is discarded
+when it ends. All decisions, progress, and state must be written to $state_file
+and $context_file before you exit.
+
 Maximum features per session: $max_features_per_session.
 Session timeout: $session_timeout -- stop and persist state before this limit."
     ]

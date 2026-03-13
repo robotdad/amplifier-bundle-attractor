@@ -21,6 +21,7 @@ Spec coverage: iteration.dot Phase 3 requirements.
 from __future__ import annotations
 
 import os
+from typing import Any
 
 import pytest
 
@@ -721,4 +722,296 @@ class TestPostSessionParse:
         assert (from_node, to_node) in edge_pairs, (
             f"Edge {from_node} -> {to_node} not found. "
             f"Present edges: {sorted(edge_pairs)}"
+        )
+
+
+# ===========================================================================
+# TestIterationExecution -- mock-backend execution tests for iteration.dot
+# ===========================================================================
+
+_STUB_POST_SESSION_DOT = """\
+digraph PostSession {
+    start [shape=Mdiamond]
+    done  [shape=Msquare]
+    start -> done
+}
+"""
+
+
+class MockToolHandler:
+    """Configurable tool handler that returns specified context_updates per node.
+
+    Simulates parse_json by returning context_updates directly without executing
+    any shell command. Used to control conditional routing in execution tests.
+    """
+
+    def __init__(
+        self,
+        context_updates_by_node: dict[str, dict] | None = None,
+        failing_nodes: set[str] | None = None,
+    ) -> None:
+        self._context_updates = context_updates_by_node or {}
+        self._failing_nodes = failing_nodes or set()
+        self.called: list[str] = []
+
+    async def execute(  # type: ignore[override]
+        self,
+        node: "Any",
+        context: "Any",
+        graph: "Any",
+        logs_root: str,
+    ) -> "Any":
+        import os
+
+        from amplifier_module_loop_pipeline.outcome import Outcome, StageStatus
+
+        self.called.append(node.id)
+        os.makedirs(os.path.join(logs_root, node.id), exist_ok=True)
+
+        if node.id in self._failing_nodes:
+            return Outcome(
+                status=StageStatus.FAIL,
+                failure_reason=f"Simulated tool failure for node {node.id!r}",
+            )
+        updates = self._context_updates.get(node.id, {})
+        return Outcome(status=StageStatus.SUCCESS, context_updates=updates)
+
+
+class FailingToolHandler:
+    """Tool handler that always returns FAIL for every node."""
+
+    def __init__(self) -> None:
+        self.called: list[str] = []
+
+    async def execute(  # type: ignore[override]
+        self,
+        node: "Any",
+        context: "Any",
+        graph: "Any",
+        logs_root: str,
+    ) -> "Any":
+        import os
+
+        from amplifier_module_loop_pipeline.outcome import Outcome, StageStatus
+
+        self.called.append(node.id)
+        os.makedirs(os.path.join(logs_root, node.id), exist_ok=True)
+        return Outcome(status=StageStatus.FAIL, failure_reason="tool always fails")
+
+
+class NoOpBackend:
+    """Codergen backend that returns SUCCESS for every node (no LLM calls)."""
+
+    def __init__(self) -> None:
+        self.called: list[str] = []
+
+    async def run(self, node: "Any", prompt: str, context: "Any") -> "Any":
+        from amplifier_module_loop_pipeline.outcome import Outcome, StageStatus
+
+        self.called.append(node.id)
+        return Outcome(status=StageStatus.SUCCESS, notes=f"NoOp: {node.id}")
+
+
+class TestIterationExecution:
+    """Mock-backend execution tests for iteration.dot.
+
+    These tests verify routing behavior without executing real shell commands
+    or spawning LLM sessions. The MockToolHandler controls what context_updates
+    each tool node produces, which drives the conditional gates.
+    """
+
+    def _make_engine(
+        self,
+        tmp_path,
+        tool_handler: object | None = None,
+        backend: object | None = None,
+    ):
+        """Build a PipelineEngine over a patched iteration.dot.
+
+        Patches applied:
+        1. dot_file for post_session -> absolute path of stub post-session.dot
+        2. post_session -> start edge -> post_session -> done (avoid infinite loop)
+        """
+        from amplifier_module_loop_pipeline.context import PipelineContext
+        from amplifier_module_loop_pipeline.dot_parser import parse_dot
+        from amplifier_module_loop_pipeline.engine import PipelineEngine
+        from amplifier_module_loop_pipeline.handlers import HandlerRegistry
+        from amplifier_module_loop_pipeline.validation import validate_or_raise
+
+        # 1. Write stub post-session.dot
+        stub_path = tmp_path / "post-session.dot"
+        stub_path.write_text(_STUB_POST_SESSION_DOT)
+
+        # 2. Load and patch iteration.dot
+        with open(_ITERATION_DOT) as f:
+            dot_source = f.read()
+
+        # Patch dot_file to absolute path so PipelineHandler can find it
+        dot_source = dot_source.replace(
+            'dot_file="post-session.dot"',
+            f'dot_file="{stub_path}"',
+        )
+        # Break the post_session -> start loop to prevent infinite iteration
+        dot_source = dot_source.replace(
+            "post_session -> start",
+            "post_session -> done",
+        )
+
+        # 3. Parse and validate
+        graph = parse_dot(dot_source)
+        validate_or_raise(graph)
+
+        # 4. Set required context variables
+        context = PipelineContext()
+        context.set("state_file", str(tmp_path / "STATE.yaml"))
+        context.set("context_file", str(tmp_path / "CONTEXT.md"))
+        context.set("specs_dir", str(tmp_path / "specs"))
+        context.set("project_dir", str(tmp_path))
+        context.set("architecture_spec", str(tmp_path / "ARCHITECTURE.md"))
+        context.set("test_command", "echo test")
+        context.set("build_command", "echo build")
+        context.set("commit_prefix", "test")
+        context.set("max_features_per_session", "3")
+        context.set("module_size_threshold", "500")
+        context.set("session_timeout", "3600")
+        context.set("build_timeout", "120")
+
+        # 5. Build HandlerRegistry with optional mock overrides
+        registry = HandlerRegistry(backend=backend or NoOpBackend())
+        if tool_handler is not None:
+            registry.register("tool", tool_handler)
+
+        # 6. Create engine
+        logs_root = str(tmp_path / "logs")
+        return PipelineEngine(
+            graph=graph,
+            context=context,
+            handler_registry=registry,
+            logs_root=logs_root,
+        )
+
+    # -----------------------------------------------------------------------
+    # Test 1: orient returns status=blocked → exits at orient_gate → done
+    # -----------------------------------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_blocked_status_exits_early(self, tmp_path):
+        """orient returns status=blocked: spec_drift and working_session must NOT run.
+
+        When orient produces context.status=blocked, orient_gate routes directly
+        to done. The pipeline should exit without running any downstream nodes.
+        """
+        mock_tool = MockToolHandler(
+            context_updates_by_node={"orient": {"status": "blocked"}}
+        )
+        engine = self._make_engine(tmp_path, tool_handler=mock_tool)
+
+        await engine.run()
+
+        assert "orient" in engine.completed_nodes, "orient must have run"
+        assert "orient_gate" in engine.completed_nodes, "orient_gate must have run"
+        assert "spec_drift" not in engine.completed_nodes, (
+            "spec_drift must NOT run when orient returns status=blocked"
+        )
+        assert "working_session" not in engine.completed_nodes, (
+            "working_session must NOT run when orient returns status=blocked"
+        )
+
+    # -----------------------------------------------------------------------
+    # Test 2: orient returns status=healthy → proceeds to spec_drift
+    # -----------------------------------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_healthy_status_proceeds_to_preflight(self, tmp_path):
+        """orient returns status=healthy: spec_drift must run.
+
+        After orient produces context.status=healthy, orient_gate routes to
+        spec_drift. Exit early by having test_preflight produce test_env=broken
+        so test_preflight_gate routes to done without wasting test time.
+        """
+        mock_tool = MockToolHandler(
+            context_updates_by_node={
+                "orient": {"status": "healthy"},
+                "test_preflight": {"test_env": "broken"},
+            }
+        )
+        engine = self._make_engine(tmp_path, tool_handler=mock_tool)
+
+        await engine.run()
+
+        assert "spec_drift" in engine.completed_nodes, (
+            "spec_drift must run when orient returns status=healthy"
+        )
+        assert "working_session" not in engine.completed_nodes, (
+            "working_session must NOT run when test_preflight returns test_env=broken"
+        )
+
+    # -----------------------------------------------------------------------
+    # Test 3: test_preflight returns test_env=broken → exits early
+    # -----------------------------------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_test_env_broken_exits_early(self, tmp_path):
+        """test_preflight returns test_env=broken: module_health and working_session must NOT run.
+
+        test_preflight_gate has a hard-gate 'broken' edge to done.
+        When the test environment is broken, neither module_health nor working_session
+        should execute (no point in running code when the test runner is broken).
+        """
+        mock_tool = MockToolHandler(
+            context_updates_by_node={
+                "orient": {"status": "healthy"},
+                "test_preflight": {"test_env": "broken"},
+            }
+        )
+        engine = self._make_engine(tmp_path, tool_handler=mock_tool)
+
+        await engine.run()
+
+        assert "test_preflight" in engine.completed_nodes, (
+            "test_preflight must have run"
+        )
+        assert "module_health" not in engine.completed_nodes, (
+            "module_health must NOT run when test_env=broken"
+        )
+        assert "working_session" not in engine.completed_nodes, (
+            "working_session must NOT run when test_env=broken"
+        )
+
+    # -----------------------------------------------------------------------
+    # Test 4: continue_on_fail nodes fail but pipeline reaches working_session
+    # -----------------------------------------------------------------------
+
+    @pytest.mark.asyncio
+    async def test_continue_on_fail_preflight_nodes_dont_halt(self, tmp_path):
+        """spec_drift/api_inventory/module_health fail → pipeline still reaches working_session.
+
+        All three nodes have continue_on_fail='true', so FAIL outcomes are
+        overridden to SUCCESS for routing purposes. The pipeline must proceed
+        all the way to working_session despite these failures.
+        """
+        mock_tool = MockToolHandler(
+            context_updates_by_node={
+                "orient": {"status": "healthy"},
+                "test_preflight": {"test_env": "ok"},
+                "build_check": {"build_status": "clean"},
+            },
+            failing_nodes={"spec_drift", "api_inventory", "module_health"},
+        )
+        backend = NoOpBackend()
+        engine = self._make_engine(tmp_path, tool_handler=mock_tool, backend=backend)
+
+        await engine.run()
+
+        assert "working_session" in engine.completed_nodes, (
+            "working_session must run even when spec_drift/api_inventory/module_health fail"
+        )
+        assert "spec_drift" in engine.completed_nodes, (
+            "spec_drift must have been attempted (then continue_on_fail overrides)"
+        )
+        assert "api_inventory" in engine.completed_nodes, (
+            "api_inventory must have been attempted"
+        )
+        assert "module_health" in engine.completed_nodes, (
+            "module_health must have been attempted"
         )

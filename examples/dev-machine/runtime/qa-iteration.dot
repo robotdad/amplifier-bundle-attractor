@@ -55,7 +55,7 @@ digraph QAIteration {
     // Dispatches a fresh agent with zero prior context.
     // context_fidelity=truncate keeps token budget manageable.
     // VERBATIM prompt from dev-machine-qa-iteration.yaml qa-session step
-    // (lines 67-107) with {{variable}} -> $variable adaptation.
+    // (lines 67-107) with template variable tokens adapted to $variable notation.
     // -----------------------------------------------------------------------
 
     qa_session [

@@ -83,6 +83,52 @@ class TestPostSessionArchiveOutput:
         )
 
 
+class TestPostSessionArchiveEdgeCases:
+    """Tests for edge cases and error handling."""
+
+    def test_empty_state_file_exits_nonzero_with_meaningful_error(self, tmp_path):
+        """Script exits non-zero with a clear error when state file is empty YAML."""
+        state_file = tmp_path / "STATE.yaml"
+        state_file.write_text("")  # Empty YAML → yaml.safe_load returns None
+        ctx_file = _make_context_file(tmp_path)
+        result = run_script(SCRIPT, str(state_file), str(ctx_file))
+        assert result.returncode != 0
+        data = parse_last_json(result.stdout)
+        assert isinstance(data, dict), "Error output should be a JSON object"
+        error_msg = data.get("error", "").lower()
+        assert "state" in error_msg or "empty" in error_msg or "invalid" in error_msg, (
+            f"Error message should describe the problem clearly, got: {data.get('error')}"
+        )
+
+    def test_archives_old_sessions_to_session_archive(self, tmp_path):
+        """Sessions beyond KEEP_SESSIONS=5 are archived to SESSION-ARCHIVE.md."""
+        state_file = _make_state_with_completed(tmp_path)
+        ctx_file = _make_context_file(tmp_path, num_sessions=7)
+        result = run_script(SCRIPT, str(state_file), str(ctx_file))
+        assert result.returncode == 0, (
+            f"Expected exit 0, got {result.returncode}. stderr: {result.stderr}"
+        )
+
+        # SESSION-ARCHIVE.md should be created
+        archive_path = tmp_path / "SESSION-ARCHIVE.md"
+        assert archive_path.exists(), (
+            "SESSION-ARCHIVE.md should be created when sessions exceed KEEP_SESSIONS"
+        )
+
+        # CONTEXT-TRANSFER.md should be rewritten with a note about archiving
+        ctx_content = ctx_file.read_text()
+        assert "archived" in ctx_content.lower(), (
+            "CONTEXT-TRANSFER.md should contain a note about archived sessions"
+        )
+
+        # Output should report a non-zero archived_sessions count
+        data = parse_last_json(result.stdout)
+        assert isinstance(data, dict), "Output should be a JSON object"
+        assert data.get("archived_sessions", 0) > 0, (
+            "archived_sessions should be non-zero when sessions were archived"
+        )
+
+
 class TestPostSessionArchiveFeatures:
     """Tests for feature archiving behaviour."""
 

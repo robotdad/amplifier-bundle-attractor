@@ -115,7 +115,10 @@ def archive_sessions(context_file: str) -> int:
             with open(session_archive) as f:
                 existing = f.read()
 
-        if to_archive[:50] not in existing:
+        # Use the first session heading as a dedup marker — session-specific and unambiguous
+        heading_match = re.search(r"^### Session \d+ Summary", to_archive, re.MULTILINE)
+        dedup_marker = heading_match.group(0) if heading_match else to_archive[:80]
+        if dedup_marker not in existing:
             if not existing:
                 # Create file with header on first write
                 with open(session_archive, "w") as f:
@@ -155,6 +158,9 @@ def main() -> int:
     try:
         with open(state_file) as f:
             state = yaml.safe_load(f)
+
+        if state is None:
+            raise ValueError("State file is empty or invalid YAML")
 
         state_dir = Path(state_file).parent
 

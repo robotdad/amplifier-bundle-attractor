@@ -18,7 +18,7 @@ Exits 0 always (informational check).
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -115,7 +115,7 @@ def add_blocker(state_file: Path, package_name: str, loc: int, threshold: int) -
                 "Refactoring required before further feature work."
             ),
             "severity": "high",
-            "created_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "package": package_name,
         }
     )
@@ -143,7 +143,10 @@ def main() -> int:
         print(json.dumps({"status": "error", "error": "threshold must be an integer"}))
         return 1
 
-    # Change to project_dir
+    # Change to project_dir as specified by the pipeline contract.
+    # Note: all subsequent file I/O uses absolute Path objects, so this
+    # chdir does not affect file resolution — it satisfies the step spec
+    # requirement that the script "changes to project_dir".
     if project_dir.exists():
         os.chdir(project_dir)
 
@@ -185,11 +188,11 @@ def main() -> int:
 
         result = {
             "health": "needs-refactoring",
-            "oversized": {pkg: loc for pkg, loc in unplanned_packages},
+            "oversized": dict(unplanned_packages),
             "packages": packages_loc,
         }
         if planned_packages:
-            result["planned"] = {pkg: loc for pkg, loc in planned_packages}
+            result["planned"] = dict(planned_packages)
         print(json.dumps(result))
         return 0
 
@@ -203,7 +206,7 @@ def main() -> int:
     result = {
         "health": "warn-oversized",
         "planned": True,
-        "oversized": {pkg: loc for pkg, loc in planned_packages},
+        "oversized": dict(planned_packages),
         "packages": packages_loc,
     }
     print(json.dumps(result))

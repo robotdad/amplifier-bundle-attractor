@@ -147,7 +147,8 @@ class TestToolEnv:
         node = Node(
             id="tool_node",
             attrs={
-                "tool_command": "echo ok",
+                # Print env var if set, else echo "absent" — confirms var was not injected
+                "tool_command": "printenv NONEXISTENT_VAR || echo absent",
                 "tool_env": "nonexistent_var",
             },
         )
@@ -158,6 +159,12 @@ class TestToolEnv:
         assert outcome.status == StageStatus.SUCCESS, (
             f"Expected SUCCESS when context var is missing (silently skipped), "
             f"got {outcome.status!r}: {outcome.failure_reason!r}"
+        )
+        tool_output = ctx.get("tool.output", "")
+        assert "absent" in tool_output, (
+            f"Expected NONEXISTENT_VAR to be absent from subprocess env "
+            f"(printenv should fail, echo absent should run), "
+            f"got tool.output={tool_output!r}"
         )
 
     @pytest.mark.asyncio
@@ -175,7 +182,7 @@ class TestToolEnv:
             id="tool_node",
             attrs={
                 # Note deliberate spaces around names
-                "tool_command": "echo $STATE_FILE",
+                "tool_command": "echo $STATE_FILE $BUILD_COMMAND",
                 "tool_env": " state_file , build_command ",
             },
         )
@@ -189,6 +196,10 @@ class TestToolEnv:
         tool_output = ctx.get("tool.output", "")
         assert "/trimmed/path" in tool_output, (
             f"Expected STATE_FILE='/trimmed/path' injected after whitespace trim, "
+            f"got tool.output={tool_output!r}"
+        )
+        assert "make test" in tool_output, (
+            f"Expected BUILD_COMMAND='make test' injected after whitespace trim, "
             f"got tool.output={tool_output!r}"
         )
 
@@ -208,9 +219,7 @@ class TestToolEnv:
             attrs={
                 # No tool_env attribute
                 # Print env var with fallback so the command still succeeds
-                "tool_command": (
-                    "echo ${TEST_UNIQUE_CONTEXT_VAR_P10:-not_injected}"
-                ),
+                "tool_command": ("echo ${TEST_UNIQUE_CONTEXT_VAR_P10:-not_injected}"),
             },
         )
         handler = ToolHandler()

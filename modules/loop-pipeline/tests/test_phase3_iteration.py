@@ -588,7 +588,13 @@ class TestPostSessionParse:
     ]
 
     def test_all_required_node_ids_present(self):
-        """All 7 required node IDs are present."""
+        """All 7 required node IDs are present.
+
+        Intentionally overlaps with test_each_required_node_id[*] below:
+        this bulk test catches the complete set in one assertion, while the
+        parametrized variant gives per-node visibility in CI output so a
+        failure names exactly which node is missing.
+        """
         graph = _graph_post_session()
         missing = [nid for nid in self.REQUIRED_NODE_IDS if nid not in graph.nodes]
         assert not missing, (

@@ -1,0 +1,272 @@
+// generate-machine.dot -- Artifact Generation Pipeline
+//
+// Translates the /generate-machine mode (194 lines) + machine-generator agent (115 lines)
+// + templates-reference.md (115 lines) into a DOT pipeline.
+//
+// First checks for a completed machine design (.dev-machine-design.md).
+// If no design exists, exits immediately with a message to run /machine-design first.
+// If the design exists, reads and summarizes it, checks QA configuration,
+// then runs convergence-factory phases to generate all runtime DOT files,
+// pipeline scripts, and infrastructure artifacts.
+//
+// Generation phases:
+//   gen_iteration      -- runtime/iteration.dot        (core 8-step dev loop)
+//   gen_post_session   -- runtime/post-session.dot     (archiving + accounting)
+//   gen_health_check   -- runtime/health-check.dot     (machine health monitoring)
+//   gen_fix_iteration  -- runtime/fix-iteration.dot    (fix cycle pipeline)
+//   gen_qa             -- runtime/qa-iteration.dot     (conditional: qa_enabled=true only)
+//   gen_scripts        -- pipeline scripts              (orient.py, build-check.py, etc.)
+//   gen_infra          -- infrastructure scripts        (entrypoint.sh, watchdog, Dockerfile)
+//
+// Design gate routing:
+//   design_exists=false -> done_no_design   (early exit: no design document found)
+//   design_exists=true  -> read_design      (proceed with generation)
+//
+// QA gate routing:
+//   qa_enabled=false -> gen_iteration       (skip QA pipeline generation)
+//   qa_enabled=true  -> gen_qa -> gen_iteration (generate QA pipeline, then continue)
+//
+// After all generation: validation_all -> gen_smoke_test -> done_complete
+//
+// Source material:
+//   amplifier-bundle-dev-machine/modes/generate-machine.md (194 lines)
+//   amplifier-bundle-dev-machine/agents/machine-generator.md (115 lines)
+//   amplifier-bundle-dev-machine/context/templates-reference.md (115 lines)
+
+digraph GenerateMachine {
+    graph [label="Dev Machine Generate: Artifact Generation Pipeline"]
+    rankdir=TB
+
+    // -----------------------------------------------------------------------
+    // Entry point
+    // -----------------------------------------------------------------------
+
+    start [shape=Mdiamond, label="Start"]
+
+    // -----------------------------------------------------------------------
+    // Design check (tool/parallelogram)
+    // Checks whether .dev-machine-design.md exists; outputs JSON with
+    // design_exists: true or false.
+    // -----------------------------------------------------------------------
+
+    design_check [
+        shape=parallelogram,
+        label="Check Design",
+        tool_command="test -f .dev-machine-design.md && echo '{\"design_exists\": true}' || echo '{\"design_exists\": false}'",
+        parse_json=true
+    ]
+
+    // -----------------------------------------------------------------------
+    // Design gate (diamond) -- routes by context.design_exists
+    // -----------------------------------------------------------------------
+
+    design_gate [shape=diamond, label="Design Exists?"]
+
+    // -----------------------------------------------------------------------
+    // Read design (codergen/box)
+    // Reads .dev-machine-design.md and extracts all template variables
+    // into a structured map for use during generation.
+    // Source: generate-machine.md Step 1 (lines 39-47)
+    // -----------------------------------------------------------------------
+
+    read_design [
+        shape=box,
+        label="Read Design Document",
+        prompt="Read the machine design document and extract all template variable values.\n\nSource: generate-machine.md Step 1 (Read the Design Document)\n\nRead .dev-machine-design.md and extract ALL variable values into a structured map.\n\nVerify all required variables are present:\n- project_name, project_dir, state_file, context_file\n- specs_dir, build_command, test_command, architecture_spec\n\nAlso extract optional variables if present:\n- type_check_command, max_features_per_session, max_outer_iterations\n- max_fix_iterations, session_timeout, build_timeout\n- module_size_threshold, file_size_threshold\n- qa_enabled, ci_enabled, branching_mode, qa_url\n- container_name, image_name, bundle_dir\n- base_image, uv_version, user_home, username\n- system_packages, node_setup, python_dev_tools\n- commit_prefix, error_pattern, cf_backoff, cf_backoff_max\n\nRead @dev-machine:context/templates-reference.md for the full variable reference.\n\nIf any required variables are missing, report them clearly and stop.\n\nOutput the extracted variable map as a summary for use in subsequent generation steps.\n\nAlso run: mkdir -p .dev-machine"
+    ]
+
+    // -----------------------------------------------------------------------
+    // QA check (tool/parallelogram)
+    // Reads qa_enabled from the design context to route QA generation.
+    // -----------------------------------------------------------------------
+
+    qa_check [
+        shape=parallelogram,
+        label="Check QA Enabled",
+        tool_command="python3 -c \"import re; content=open('.dev-machine-design.md').read(); m=re.search(r'qa_enabled[^|]*\\|([^|]+)\\|', content); enabled=m.group(1).strip().lower() if m else 'false'; print('{\\\"qa_enabled\\\": ' + ('true' if enabled == 'true' else 'false') + '}')\"",
+        parse_json=true
+    ]
+
+    // -----------------------------------------------------------------------
+    // QA gate (diamond) -- routes by context.qa_enabled
+    // -----------------------------------------------------------------------
+
+    qa_gate [shape=diamond, label="QA Enabled?"]
+
+    // -----------------------------------------------------------------------
+    // gen_qa: Generate QA iteration pipeline (conditional -- qa_enabled=true only)
+    // Source: generate-machine.md Step 3 (lines 69-71) + machine-generator.md Output Locations
+    // -----------------------------------------------------------------------
+
+    gen_qa [
+        shape=folder,
+        label="Generate QA Iteration Pipeline",
+        dot_file="../../patterns/convergence-factory.dot",
+        context.artifact_goal="Generate the QA iteration pipeline DOT file: runtime/qa-iteration.dot\n\nSource: generate-machine.md Step 3 (QA recipes, lines 69-71) + machine-generator.md Output Locations\n\nThis pipeline is only generated when qa_enabled=true.\n\nRead @dev-machine:context/templates-reference.md for the full variable reference.\nRead the existing runtime/iteration.dot and runtime/health-check.dot as structural references.\n\nGenerate runtime/qa-iteration.dot following the Attractor pipeline framework.\nThe QA iteration pipeline should:\n\n1. orient node (parallelogram, parse_json=true)\n   - Reads STATE.yaml to get current QA test targets and status\n   - tool_command: python3 scripts/pipeline/orient.py $state_file\n\n2. qa_session node (box)\n   - Runs QA testing against the project using $qa_url and $test_command\n   - Validates UI flows, API contracts, or integration tests as defined in design\n   - context_fidelity=truncate for token budget\n   - Prompt: Read STATE.yaml, run QA tests against $qa_url, report results, update STATE.yaml\n\n3. qa_result node (parallelogram, parse_json=true)\n   - Runs QA result check script\n   - tool_command: python3 scripts/pipeline/qa-result-check.py $project_dir $state_file\n\n4. qa_gate node (diamond)\n   - Routes on context.qa_status: passed|failed\n\n5. Terminal nodes:\n   - done_passed (Msquare): QA passed\n   - done_failed (Msquare): QA failed (outer loop handles retry/escalation)\n\nThe artifact is the file runtime/qa-iteration.dot itself.\nWrite the complete, valid DOT file using the Attractor pipeline framework syntax.\nValidate that the DOT file parses correctly before completing.",
+        context.artifact_path="runtime/qa-iteration.dot",
+        context.max_cycles=3
+    ]
+
+    // -----------------------------------------------------------------------
+    // gen_iteration: Generate iteration pipeline
+    // Source: generate-machine.md Step 3 (lines 55-68) + machine-generator.md Output Locations
+    // -----------------------------------------------------------------------
+
+    gen_iteration [
+        shape=folder,
+        label="Generate Iteration Pipeline",
+        dot_file="../../patterns/convergence-factory.dot",
+        context.artifact_goal="Generate the core development iteration pipeline DOT file: runtime/iteration.dot\n\nSource: generate-machine.md Step 3 (Generate Recipe Files, lines 55-68) + machine-generator.md Generation Rules (lines 43-48)\n\nRead @dev-machine:context/templates-reference.md for the full variable reference.\nRead the existing examples/dev-machine/runtime/iteration.dot as the canonical reference.\n\nGenerate runtime/iteration.dot following the Attractor pipeline framework.\nThe iteration pipeline is the core 8-step development machine loop:\n\n1. orient node (parallelogram, parse_json=true)\n   - Reads STATE.yaml to extract status/phase/epoch\n   - tool_command: python3 scripts/pipeline/orient.py $state_file\n\n2. orient_gate node (diamond)\n   - Routes on context.status: blocked -> done; healthy -> spec_drift\n\n3. spec_drift node (parallelogram, continue_on_fail=true)\n   - Non-blocking: compares spec mtimes vs implementation mtimes\n   - tool_command: python3 scripts/pipeline/spec-drift-check.py $project_dir $specs_dir\n\n4. api_inventory node (parallelogram, continue_on_fail=true)\n   - Non-blocking: scans project for public types/APIs, writes to SCRATCH.md\n   - tool_command: python3 scripts/pipeline/api-inventory.py $project_dir\n\n5. test_preflight node (parallelogram, parse_json=true)\n   - HARD GATE: validates test runner works before wasting a working session\n   - tool_command: python3 scripts/pipeline/test-env-preflight.py $project_dir $test_command\n\n6. test_preflight_gate node (diamond)\n   - Routes on context.test_env: broken -> done; ok -> module_health\n\n7. module_health node (parallelogram, continue_on_fail=true)\n   - Non-blocking: flags oversized packages before working session\n   - tool_command: python3 scripts/pipeline/module-health-check.py $project_dir $state_file $module_size_threshold\n\n8. working_session node (box, context_fidelity=truncate)\n   - Core LLM work step -- dispatches fresh agent with zero prior context\n   - Safety-constrained prompt with FORBIDDEN commands section\n   - Reads: $state_file, $context_file, .dev-machine/working-session-instructions.md\n   - Platform Grounding: enumerate actual types before writing code\n   - Maximum features: $max_features_per_session; Timeout: $session_timeout\n\n9. build_check node (parallelogram, parse_json=true)\n   - Runs build command, parses JSON output for structured status\n   - tool_command: python3 scripts/pipeline/build-check.py $project_dir $build_command $build_timeout\n\n10. build_gate node (diamond)\n    - Routes on context.build_status: BOTH clean and failed -> post_session\n\n11. post_session node (folder)\n    - Delegates to post-session.dot for archiving, accounting, reconcile, status\n    - Loops back to start for next iteration\n    - dot_file: post-session.dot\n\nThe artifact is the file runtime/iteration.dot itself.\nWrite the complete, valid DOT file using the Attractor pipeline framework syntax.\nValidate that the DOT file parses correctly before completing.",
+        context.artifact_path="runtime/iteration.dot",
+        context.max_cycles=3
+    ]
+
+    // -----------------------------------------------------------------------
+    // gen_post_session: Generate post-session pipeline
+    // Source: generate-machine.md (archiving and accounting steps)
+    // -----------------------------------------------------------------------
+
+    gen_post_session [
+        shape=folder,
+        label="Generate Post-Session Pipeline",
+        dot_file="../../patterns/convergence-factory.dot",
+        context.artifact_goal="Generate the post-session pipeline DOT file: runtime/post-session.dot\n\nSource: generate-machine.md (archiving and session accounting) + machine-generator.md\n\nRead @dev-machine:context/templates-reference.md for the full variable reference.\nRead the existing examples/dev-machine/runtime/post-session.dot as the canonical reference.\n\nGenerate runtime/post-session.dot following the Attractor pipeline framework.\nThe post-session pipeline handles all end-of-session accounting and state persistence:\n\n1. archive_session node (parallelogram)\n   - Archives session logs and context to .ai/ directory\n   - tool_command: python3 scripts/pipeline/archive-session.py $project_dir $state_file $context_file\n\n2. reconcile_state node (box)\n   - Reconciles STATE.yaml after the working session\n   - Reviews completed features, updates feature statuses\n   - Ensures state consistency before the next iteration\n\n3. update_context node (box)\n   - Updates CONTEXT-TRANSFER.md with decisions and handoff notes from this session\n   - Summarizes what was done, what's next, any blockers encountered\n\n4. epoch_check node (parallelogram, parse_json=true)\n   - Checks if epoch boundary conditions are met (outer loop decisions)\n   - tool_command: python3 scripts/pipeline/epoch-check.py $state_file $max_outer_iterations\n\n5. done node (Msquare)\n   - Terminal: post-session complete, iteration will loop back to start\n\nThe artifact is the file runtime/post-session.dot itself.\nWrite the complete, valid DOT file using the Attractor pipeline framework syntax.\nValidate that the DOT file parses correctly before completing.",
+        context.artifact_path="runtime/post-session.dot",
+        context.max_cycles=3
+    ]
+
+    // -----------------------------------------------------------------------
+    // gen_health_check: Generate health check pipeline
+    // Source: generate-machine.md Step 3 (lines 66-67) + machine-generator.md Output Locations
+    // -----------------------------------------------------------------------
+
+    gen_health_check [
+        shape=folder,
+        label="Generate Health Check Pipeline",
+        dot_file="../../patterns/convergence-factory.dot",
+        context.artifact_goal="Generate the machine health check pipeline DOT file: runtime/health-check.dot\n\nSource: generate-machine.md Step 3 (health-check.yaml, lines 66-67) + machine-generator.md Output Locations\n\nRead @dev-machine:context/templates-reference.md for the full variable reference.\nRead the existing examples/dev-machine/runtime/health-check.dot as the canonical reference.\n\nGenerate runtime/health-check.dot following the Attractor pipeline framework.\nThe health check pipeline monitors machine health and dispatches fix iterations when needed:\n\n1. health_orient node (parallelogram, parse_json=true)\n   - Reads STATE.yaml to get current machine health status\n   - tool_command: python3 scripts/pipeline/orient.py $state_file\n\n2. run_build node (parallelogram, parse_json=true)\n   - Runs the build/test commands to assess machine health\n   - tool_command: python3 scripts/pipeline/build-check.py $project_dir $build_command $build_timeout\n\n3. health_gate node (diamond)\n   - Routes on context.build_status: clean -> done_healthy; failed -> fix_iteration\n\n4. fix_iteration node (folder)\n   - Sub-pipeline: delegates to fix-iteration.dot for repair cycles\n   - dot_file: fix-iteration.dot\n   - Loops back to health_orient after fix attempts\n\n5. done_healthy (Msquare): Machine is healthy\n6. done_unhealthy (Msquare): Machine could not be repaired (escalate to human)\n\nThe artifact is the file runtime/health-check.dot itself.\nWrite the complete, valid DOT file using the Attractor pipeline framework syntax.\nValidate that the DOT file parses correctly before completing.",
+        context.artifact_path="runtime/health-check.dot",
+        context.max_cycles=3
+    ]
+
+    // -----------------------------------------------------------------------
+    // gen_fix_iteration: Generate fix iteration pipeline
+    // Source: generate-machine.md Step 3 (lines 67) + machine-generator.md Output Locations
+    // -----------------------------------------------------------------------
+
+    gen_fix_iteration [
+        shape=folder,
+        label="Generate Fix Iteration Pipeline",
+        dot_file="../../patterns/convergence-factory.dot",
+        context.artifact_goal="Generate the fix iteration pipeline DOT file: runtime/fix-iteration.dot\n\nSource: generate-machine.md Step 3 (fix-iteration.yaml, line 67) + machine-generator.md Output Locations\n\nRead @dev-machine:context/templates-reference.md for the full variable reference.\nRead the existing examples/dev-machine/runtime/fix-iteration.dot as the canonical reference.\n\nGenerate runtime/fix-iteration.dot following the Attractor pipeline framework.\nThe fix iteration pipeline attempts to repair a broken build:\n\n1. fix_orient node (parallelogram, parse_json=true)\n   - Reads STATE.yaml and build failure context\n   - tool_command: python3 scripts/pipeline/orient.py $state_file\n\n2. fix_session node (box, context_fidelity=truncate)\n   - Dispatches a fix-focused LLM working session\n   - Reads: $state_file, $context_file, build failure output\n   - Prompt: You are a FIX SESSION. The build is failing. Read the error output.\n     Do NOT add features. Fix ONLY what is broken. Run $build_command after each fix.\n     Maximum fix iterations: $max_fix_iterations. Update STATE.yaml when done.\n\n3. fix_build_check node (parallelogram, parse_json=true)\n   - Re-runs build to check if fix was successful\n   - tool_command: python3 scripts/pipeline/build-check.py $project_dir $build_command $build_timeout\n\n4. fix_gate node (diamond)\n   - Routes on context.build_status: clean -> done_fixed; failed -> check_retry\n\n5. check_retry node (parallelogram, parse_json=true)\n   - Checks if max_fix_iterations has been reached\n   - tool_command: python3 scripts/pipeline/check-retry.py $state_file $max_fix_iterations\n\n6. retry_gate node (diamond)\n   - Routes on context.retry_allowed: yes -> fix_orient (try again); no -> done_exhausted\n\n7. done_fixed (Msquare): Build repaired\n8. done_exhausted (Msquare): Max fix iterations reached, escalate to human\n\nThe artifact is the file runtime/fix-iteration.dot itself.\nWrite the complete, valid DOT file using the Attractor pipeline framework syntax.\nValidate that the DOT file parses correctly before completing.",
+        context.artifact_path="runtime/fix-iteration.dot",
+        context.max_cycles=3
+    ]
+
+    // -----------------------------------------------------------------------
+    // gen_scripts: Generate pipeline scripts
+    // Source: generate-machine.md Steps 3-5 (scripts referenced in iteration.dot)
+    // -----------------------------------------------------------------------
+
+    gen_scripts [
+        shape=folder,
+        label="Generate Pipeline Scripts",
+        dot_file="../../patterns/convergence-factory.dot",
+        context.artifact_goal="Generate the pipeline scripts required by the runtime DOT pipelines.\n\nSource: generate-machine.md Steps 3-5 + machine-generator.md Generation Rules (lines 43-48)\n\nRead @dev-machine:context/templates-reference.md for the full variable reference.\nRead the design document variables: project_dir, build_command, test_command, state_file, specs_dir, module_size_threshold, max_fix_iterations.\n\nGenerate the following pipeline scripts into scripts/pipeline/:\n\n1. orient.py -- Reads STATE.yaml, extracts status/phase/epoch/next_action\n   Output: JSON {status, phase, epoch, next_action, blocked_reason}\n   status: 'blocked' if STATE.yaml has blockers section with content; else 'healthy'\n\n2. build-check.py -- Runs build command, parses output for errors\n   Args: $project_dir $build_command $build_timeout\n   Output: JSON {build_status, error_count, errors_summary}\n   build_status: 'clean' or 'failed'\n\n3. spec-drift-check.py -- Compares spec file mtimes vs implementation mtimes\n   Args: $project_dir $specs_dir\n   Output: Text summary of drift (non-blocking)\n   continue_on_fail: true\n\n4. api-inventory.py -- Scans project for public types/APIs, writes to SCRATCH.md\n   Args: $project_dir\n   Output: Appends API inventory to SCRATCH.md (non-blocking)\n   continue_on_fail: true\n\n5. test-env-preflight.py -- Validates test runner works before working session\n   Args: $project_dir $test_command\n   Output: JSON {test_env, reason}\n   test_env: 'ok' or 'broken'\n\n6. module-health-check.py -- Flags oversized packages before working session\n   Args: $project_dir $state_file $module_size_threshold\n   Output: Text warnings for oversized modules (non-blocking)\n   continue_on_fail: true\n\n7. archive-session.py -- Archives session logs to .ai/ directory\n   Args: $project_dir $state_file $context_file\n   Output: Text confirming archive location\n\n8. epoch-check.py -- Checks if epoch boundary conditions are met\n   Args: $state_file $max_outer_iterations\n   Output: JSON {epoch_complete, reason}\n\n9. check-retry.py -- Checks if max_fix_iterations reached\n   Args: $state_file $max_fix_iterations\n   Output: JSON {retry_allowed, attempts_remaining}\n\nFor each script:\n- Read the design variable values\n- Replace $variable references with actual values from the design\n- Write to scripts/pipeline/<script-name>.py\n- Scripts must be idempotent and safe to run in a fresh session\n- Scripts must output structured JSON for pipeline routing (where required)\n\nAfter generating all scripts, run: mkdir -p scripts/pipeline\n\nWrite the completion summary to .ai/gen-scripts-complete.md listing all scripts generated.",
+        context.artifact_path=".ai/gen-scripts-complete.md",
+        context.max_cycles=3
+    ]
+
+    // -----------------------------------------------------------------------
+    // gen_infra: Generate infrastructure scripts
+    // Source: generate-machine.md Steps 5-6 (lines 90-119) + machine-generator.md
+    // -----------------------------------------------------------------------
+
+    gen_infra [
+        shape=folder,
+        label="Generate Infrastructure Scripts",
+        dot_file="../../patterns/convergence-factory.dot",
+        context.artifact_goal="Generate the infrastructure scripts, Docker config, and state files.\n\nSource: generate-machine.md Steps 5-6 (lines 90-119) + machine-generator.md Output Locations (lines 50-65)\n\nRead @dev-machine:context/templates-reference.md for ALL variable names and defaults.\nRead .dev-machine-design.md to extract all template variable values.\n\n## Step 5: Generate Infrastructure Scripts (generate-machine.md lines 90-108)\n\nRead templates from @dev-machine:templates/ and generate:\n\n**Scripts** (into scripts/ directory):\n- scripts/entrypoint.sh (from @dev-machine:templates/scripts/entrypoint.sh) -- make executable (chmod +x)\n- scripts/dev-machine-watchdog.sh (from @dev-machine:templates/scripts/dev-machine-watchdog.sh) -- make executable\n- scripts/dev-machine-monitor.sh (from @dev-machine:templates/scripts/dev-machine-monitor.sh) -- make executable\n\n**Docker config** (into project root):\n- dev-machine.Dockerfile (from @dev-machine:templates/dev-machine.Dockerfile)\n- docker-compose.dev-machine.yaml (from @dev-machine:templates/docker-compose.dev-machine.yaml)\n\nFor each file:\n1. Read the template\n2. Replace ONLY generation-time variables (from templates-reference.md) with values from design\n3. Do NOT replace runtime {{}} expressions such as {{initial_state.status}}, {{session_count}}, {{status}}\n4. CRITICAL: Docker format strings like {{.State.Status}}, {{.CPUPerc}}, {{.MemUsage}} are Go templates -- do NOT replace these\n5. Write the result\n6. For .sh files, run chmod +x on the output\n\n## Step 6: Generate State and Session Files (generate-machine.md lines 111-119)\n\nAt the project root, generate:\n- STATE.yaml (from @dev-machine:templates/STATE.yaml)\n- CONTEXT-TRANSFER.md (from @dev-machine:templates/CONTEXT-TRANSFER.md)\n- SCRATCH.md (from @dev-machine:templates/SCRATCH.md)\n- AGENTS.md (from @dev-machine:templates/AGENTS.md) -- ALWAYS generated\n\nFor {{timestamp}}, use the current ISO 8601 timestamp.\n\n## Protocol Files (machine-generator.md Output Locations)\n\n- .dev-machine/working-session-instructions.md (from @dev-machine:templates/working-session-instructions.md)\n- .dev-machine/feature-spec-template.md (from @dev-machine:templates/feature-spec-template.md)\n\n## Validation (machine-generator.md lines 67-107)\n\nAfter generation, verify:\n1. All .dev-machine/*.yaml files parse as valid YAML\n2. All state files exist and are non-empty\n3. No remaining {{ or }} from generation-time variables in any generated file\n4. Recipe files reference correct relative paths\n\nRun validation script:\npython3 << 'PYEOF'\nimport yaml, glob, re\nerrors = []\nfor f in glob.glob('.dev-machine/*.yaml'):\n    try:\n        with open(f) as fh: yaml.safe_load(fh)\n    except Exception as e:\n        errors.append(f'YAML parse error in {f}: {e}')\nif errors:\n    print('VALIDATION FAILED:')\n    for e in errors: print(f'  - {e}')\nelse:\n    print('VALIDATION PASSED: All files valid, all variables substituted.')\nPYEOF\n\nWrite the completion summary to .ai/gen-infra-complete.md listing all infrastructure files generated.",
+        context.artifact_path=".ai/gen-infra-complete.md",
+        context.max_cycles=3
+    ]
+
+    // -----------------------------------------------------------------------
+    // validation_all: Validate all generated DOT files and artifacts
+    // Source: generate-machine.md Step 8 (lines 130-158) + machine-generator.md Validation
+    // -----------------------------------------------------------------------
+
+    validation_all [
+        shape=box,
+        label="Validate All Generated Artifacts",
+        prompt="Validate all generated machine artifacts.\n\nSource: generate-machine.md Step 8 (Verify Generation, lines 130-158) + machine-generator.md Validation (lines 67-107)\n\nRun the full verification sequence from generate-machine.md Step 8:\n\n```bash\necho '=== Generated Machine Files ==='\nfind .dev-machine -type f | sort\necho ''\necho '=== State Files ==='\nls -la STATE.yaml CONTEXT-TRANSFER.md SCRATCH.md AGENTS.md 2>/dev/null\necho ''\necho '=== Recipe Validation ==='\npython3 -c \"import yaml; [yaml.safe_load(open(f'.dev-machine/{r}')) for r in ['build.yaml','iteration.yaml','health-check.yaml','fix-iteration.yaml']]; print('All recipes parse as valid YAML')\"\necho ''\necho '=== Unsubstituted Variable Check ==='\nGENERATION_VARS='project_name|project_dir|state_file|context_file|specs_dir|build_command|test_command|architecture_spec|max_features_per_session|max_outer_iterations|max_fix_iterations|cf_backoff|base_image|uv_version|user_home|username|system_packages|container_name|image_name|node_setup|python_dev_tools'\nUNREPLACED=$(grep -rE \"\\{\\{($GENERATION_VARS)\\}\\}\" .dev-machine/ 2>/dev/null || true)\nif [ -n \"$UNREPLACED\" ]; then\n    echo 'ERROR: Unsubstituted generation-time variables found:'\n    echo \"$UNREPLACED\"\n    exit 1\nfi\necho 'All generation-time variables have been replaced'\necho ''\necho '=== Runtime DOT Files ==='\nls -la runtime/*.dot 2>/dev/null\necho ''\necho '=== Pipeline Scripts ==='\nls -la scripts/pipeline/*.py 2>/dev/null\necho ''\necho '=== Infrastructure Files ==='\nls -la dev-machine.Dockerfile docker-compose.dev-machine.yaml 2>/dev/null\nls -la scripts/entrypoint.sh scripts/dev-machine-watchdog.sh scripts/dev-machine-monitor.sh 2>/dev/null\necho ''\necho '=== Script Permissions ==='\nstat -c '%a %n' scripts/*.sh 2>/dev/null\n```\n\nAlso validate each runtime DOT file parses correctly:\n```bash\npython3 -c \"\nimport glob, subprocess\nfor f in glob.glob('runtime/*.dot'):\n    result = subprocess.run(['python3', '-c', f\\\"import sys; sys.path.insert(0,'modules/loop-pipeline/src'); from amplifier_module_loop_pipeline.dot_parser import parse_dot; parse_dot(open('{f}').read()); print('{f}: OK')\\\"], capture_output=True, text=True)\n    if result.returncode != 0:\n        print(f'{f}: PARSE ERROR - {result.stderr}')\n    else:\n        print(result.stdout.strip())\n\"\n```\n\nReport all validation results. If any validation fails, report the failure clearly.\nDo NOT proceed to gen_smoke_test if critical validations fail."
+    ]
+
+    // -----------------------------------------------------------------------
+    // gen_smoke_test: Generate smoke-test pipeline
+    // Source: generate-machine.md + existing runtime/smoke-test.dot reference
+    // -----------------------------------------------------------------------
+
+    gen_smoke_test [
+        shape=folder,
+        label="Generate Smoke Test Pipeline",
+        dot_file="../../patterns/convergence-factory.dot",
+        context.artifact_goal="Generate the smoke test pipeline DOT file: runtime/smoke-test.dot\n\nSource: generate-machine.md (Step 8 verification) + machine-generator.md\n\nRead @dev-machine:context/templates-reference.md for the full variable reference.\nRead the existing examples/dev-machine/runtime/smoke-test.dot as the canonical reference.\n\nGenerate runtime/smoke-test.dot following the Attractor pipeline framework.\nThe smoke test pipeline provides fast feedback on machine health:\n\n1. smoke_build node (parallelogram, parse_json=true)\n   - Runs the build command quickly to check for compilation errors\n   - tool_command: python3 scripts/pipeline/build-check.py $project_dir $build_command $build_timeout\n\n2. smoke_gate node (diamond)\n   - Routes on context.build_status: clean -> run_tests; failed -> done_smoke_failed\n\n3. run_tests node (parallelogram, parse_json=true)\n   - Runs the test suite to verify basic machine functionality\n   - tool_command: python3 scripts/pipeline/build-check.py $project_dir $test_command $build_timeout\n\n4. test_gate node (diamond)\n   - Routes on context.build_status: clean -> done_smoke_passed; failed -> done_smoke_failed\n\n5. done_smoke_passed (Msquare): Smoke test passed -- machine is functional\n6. done_smoke_failed (Msquare): Smoke test failed -- run health-check.dot for repair\n\nThe smoke test is designed to be fast (under 2 minutes) and non-destructive.\nIt validates the machine's core functionality before starting a full iteration.\n\nThe artifact is the file runtime/smoke-test.dot itself.\nWrite the complete, valid DOT file using the Attractor pipeline framework syntax.\nValidate that the DOT file parses correctly before completing.\n\nAlso print the startup instructions from generate-machine.md Step 9:\n- cron setup commands for dev-machine-watchdog.sh and dev-machine-monitor.sh\n- command to start the machine: docker compose -f docker-compose.dev-machine.yaml up -d --build\n- command to run the build recipe: amplifier recipe execute .dev-machine/build.yaml\n- command to run health checks: amplifier recipe execute .dev-machine/health-check.yaml\n\nCall mode(operation='clear') when done.\nCRITICAL: Call mode(clear) BEFORE outputting the final report.",
+        context.artifact_path="runtime/smoke-test.dot",
+        context.max_cycles=3
+    ]
+
+    // -----------------------------------------------------------------------
+    // Terminal nodes (Msquare)
+    // -----------------------------------------------------------------------
+
+    done_complete  [shape=Msquare, label="Generation Complete: Run amplifier recipe execute .dev-machine/build.yaml"]
+    done_no_design [shape=Msquare, label="No Design Found: Run /machine-design first to design your development machine"]
+
+    // -----------------------------------------------------------------------
+    // Flow: start -> design_check -> design_gate
+    // -----------------------------------------------------------------------
+
+    start        -> design_check
+    design_check -> design_gate
+
+    // -----------------------------------------------------------------------
+    // Design gate routing (2 conditional edges)
+    // -----------------------------------------------------------------------
+
+    design_gate -> done_no_design [label="no_design",    condition="context.design_exists=false"]
+    design_gate -> read_design    [label="read_design",  condition="context.design_exists=true"]
+
+    // -----------------------------------------------------------------------
+    // After reading design, check QA configuration
+    // -----------------------------------------------------------------------
+
+    read_design -> qa_check
+    qa_check    -> qa_gate
+
+    // -----------------------------------------------------------------------
+    // QA gate routing (2 conditional edges)
+    // -----------------------------------------------------------------------
+
+    qa_gate -> gen_qa        [label="qa_enabled",  condition="context.qa_enabled=true"]
+    qa_gate -> gen_iteration [label="skip_qa",     condition="context.qa_enabled=false"]
+
+    // -----------------------------------------------------------------------
+    // QA pipeline rejoins main flow at gen_iteration
+    // -----------------------------------------------------------------------
+
+    gen_qa -> gen_iteration
+
+    // -----------------------------------------------------------------------
+    // Sequential generation chain
+    // -----------------------------------------------------------------------
+
+    gen_iteration   -> gen_post_session
+    gen_post_session -> gen_health_check
+    gen_health_check -> gen_fix_iteration
+    gen_fix_iteration -> gen_scripts
+    gen_scripts      -> gen_infra
+    gen_infra        -> validation_all
+    validation_all   -> gen_smoke_test
+    gen_smoke_test   -> done_complete
+}

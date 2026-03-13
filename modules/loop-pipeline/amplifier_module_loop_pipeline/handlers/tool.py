@@ -57,6 +57,14 @@ class ToolHandler:
                 failure_reason="No tool_command specified on node",
             )
 
+        # Expand $variable tokens from pipeline context in the tool_command.
+        # This mirrors the codergen handler's prompt expansion: plain context
+        # keys (no "." in name) are expanded as $param tokens.
+        snapshot = context.snapshot()
+        for key, value in snapshot.items():
+            if "." not in str(key) and value is not None:
+                command = command.replace(f"${key}", str(value))
+
         # Write command to logs
         stage_dir = os.path.join(logs_root, node.id)
         os.makedirs(stage_dir, exist_ok=True)

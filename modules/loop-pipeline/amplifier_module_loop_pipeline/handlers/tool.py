@@ -78,12 +78,18 @@ class ToolHandler:
                 if value is not None:
                     env[var_name.upper()] = str(value)
 
+        # Resolve working directory: use graph.source_dir if available so that
+        # relative paths in tool_command (e.g., "python3 scripts/pipeline/orient.py")
+        # resolve from the DOT file's directory, not the engine's CWD.
+        cwd: str | None = graph.source_dir if graph.source_dir else None
+
         try:
             proc = await asyncio.create_subprocess_shell(
                 command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
+                cwd=cwd,
             )
             try:
                 stdout_bytes, stderr_bytes = await asyncio.wait_for(

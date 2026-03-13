@@ -156,14 +156,24 @@ def main() -> int:
 
     if project_dir.exists():
         os.chdir(project_dir)
+    else:
+        print(f"Warning: {project_dir} not found, scanning CWD")
 
     print("=== API INVENTORY ===")
 
     section = build_inventory_section()
 
     # Append to SCRATCH.md (create if missing, preserve existing content)
-    with open(scratch_file, "a") as f:
-        f.write(section)
+    try:
+        with open(scratch_file, "a") as f:
+            f.write(section)
+    except OSError as e:
+        print(
+            json.dumps(
+                {"status": "error", "error": str(e), "scratch_file": str(scratch_file)}
+            )
+        )
+        return 0
 
     print(f"API inventory appended to {scratch_file}")
 

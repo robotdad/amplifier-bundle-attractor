@@ -71,5 +71,6 @@ class TestApiInventoryOutput:
         run_script(SCRIPT, str(tmp_path))
         content = scratch.read_text()
         # Public class and function should appear in the inventory
-        assert "MyClass" in content or "mymodule.py" in content
+        assert "MyClass" in content
+        assert "public_function" in content
         assert "## API Inventory" in content

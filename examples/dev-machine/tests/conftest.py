@@ -1,7 +1,6 @@
 """Shared test utilities and fixtures for dev-machine pipeline script tests."""
 
 import json
-import re
 import subprocess
 import sys
 from pathlib import Path
@@ -70,26 +69,6 @@ def parse_last_json(output: str) -> dict | list:
     Raises:
         ValueError: If no valid JSON object or array is found in the output.
     """
-    # Find all JSON object/array candidates using a pattern that matches
-    # top-level { ... } or [ ... ] blocks
-    candidates = []
-
-    # Try to find JSON by scanning for { or [ that start a valid JSON block
-    # We try each position where a { or [ appears and attempt to parse from there
-    for match in re.finditer(r"[{\[]", output):
-        start = match.start()
-        substring = output[start:]
-        # Try increasingly large substrings to find valid JSON
-        try:
-            parsed = json.loads(substring)
-            candidates.append((start, parsed))
-            break  # Found one starting here; record it
-        except json.JSONDecodeError:
-            # Try to find the end of the JSON block by looking at lines
-            # Collect lines and try progressive accumulation
-            pass
-
-    # More robust approach: split on lines and look for JSON blocks
     lines = output.splitlines()
     json_candidates = []
 

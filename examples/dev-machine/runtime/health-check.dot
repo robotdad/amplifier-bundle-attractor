@@ -1,0 +1,88 @@
+// health-check.dot -- Systematic Build/Test Error Detection and Fixing
+//
+// Translates dev-machine-health-check.yaml into a DOT pipeline.
+// Runs build + test, captures errors, spawns fix iterations, and
+// loops until the codebase is clean or max iterations are exhausted.
+//
+// Flow:
+//   1. initial_check: run build + test, capture output, write SCRATCH.md
+//   2. clean_gate:    if already clean, exit done; otherwise enter fix loop
+//   3. fix_loop:      manager loop that runs fix-iteration.dot per cycle
+//                     until outcome=success or max iterations exhausted
+//
+// 5 nodes, 5 edges.
+// Context variables: $project_dir, $build_command, $test_command,
+//   $build_timeout, $max_fix_iterations
+
+digraph HealthCheck {
+    graph [label="Dev Machine Health Check Pipeline"]
+    rankdir=TB
+
+    // -----------------------------------------------------------------------
+    // Structural nodes
+    // -----------------------------------------------------------------------
+
+    start [shape=Mdiamond, label="Start"]
+    done  [shape=Msquare,  label="Done"]
+
+    // -----------------------------------------------------------------------
+    // Step 1: Initial health check -- run build + test, write SCRATCH.md
+    // Runs the build and test commands, captures output, writes SCRATCH.md
+    // with findings for the fix session.
+    // parse_json='true' injects status into context for clean_gate routing.
+    // continue_on_fail='true' so partial failures flow to the gate.
+    // -----------------------------------------------------------------------
+
+    initial_check [
+        shape=parallelogram,
+        label="Initial Check",
+        tool_command="bash -c 'cd $project_dir && BUILD_OUTPUT=$(${build_command} 2>&1) || true; BUILD_EXIT=$?; TEST_OUTPUT=$(${test_command} 2>&1) || true; TEST_EXIT=$?; if [ $BUILD_EXIT -eq 0 ] && [ $TEST_EXIT -eq 0 ]; then echo \"{\\\"status\\\": \\\"clean\\\"}\"; else echo \"{\\\"status\\\": \\\"needs-fixing\\\"}\"; fi'",
+        parse_json="true",
+        continue_on_fail="true"
+    ]
+
+    // -----------------------------------------------------------------------
+    // Step 2: Clean gate -- check if build + test are already passing
+    // Routes clean -> done (early exit) or failed -> fix_loop.
+    // -----------------------------------------------------------------------
+
+    clean_gate [
+        shape=diamond,
+        label="Clean?"
+    ]
+
+    // -----------------------------------------------------------------------
+    // Step 3: Fix loop -- manager loop over fix-iteration.dot
+    // Runs fix-iteration.dot per cycle until outcome=success or
+    // max iterations exhausted. Uses manager.stop_condition='outcome=success'
+    // to exit as soon as the codebase is clean.
+    // stack.child_dotfile delegates each cycle to fix-iteration.dot.
+    // -----------------------------------------------------------------------
+
+    fix_loop [
+        shape=house,
+        label="Fix Loop",
+        manager.max_cycles="$max_fix_iterations",
+        manager.stop_condition="outcome=success",
+        manager.poll_interval="0s",
+        stack.child_dotfile=".dev-machine/runtime/fix-iteration.dot"
+    ]
+
+    // -----------------------------------------------------------------------
+    // Edges (5 total)
+    // -----------------------------------------------------------------------
+
+    // Entry
+    start -> initial_check
+
+    // initial_check produces context.status = clean|needs-fixing
+    initial_check -> clean_gate
+
+    // Gate: already clean -> done (early exit)
+    clean_gate -> done     [label="clean",  condition="context.status=clean"]
+    // Gate: errors found -> enter fix loop
+    clean_gate -> fix_loop [label="failed", condition="context.status=needs-fixing"]
+
+    // Fix loop exits to done (either success or max iterations reached)
+    fix_loop -> done
+}

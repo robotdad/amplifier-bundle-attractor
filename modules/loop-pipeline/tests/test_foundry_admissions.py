@@ -28,7 +28,17 @@ import os
 
 import pytest
 
+from amplifier_module_loop_pipeline.context import PipelineContext
 from amplifier_module_loop_pipeline.dot_parser import parse_dot
+from amplifier_module_loop_pipeline.engine import PipelineEngine
+from amplifier_module_loop_pipeline.graph import Graph, Node  # noqa: F401
+from amplifier_module_loop_pipeline.handlers import HandlerRegistry
+from amplifier_module_loop_pipeline.interviewer import (  # noqa: F401
+    Answer,
+    Option,
+    QueueInterviewer,
+)
+from amplifier_module_loop_pipeline.outcome import Outcome, StageStatus
 
 # ---------------------------------------------------------------------------
 # Path helpers
@@ -405,3 +415,249 @@ class TestAdmissionsParse:
             assert required in chain, (
                 f"'{required}' not found in sequential chain: {chain}"
             )
+
+
+# ===========================================================================
+# TestAdmissionsExecution -- admissions.dot engine execution tests
+# ===========================================================================
+
+# Path helpers for execution tests
+_FOUNDRY_DIR = os.path.abspath(
+    os.path.join(_TESTS_DIR, "..", "..", "..", "examples", "dev-machine", "foundry")
+)
+_PATTERNS_DIR = os.path.abspath(
+    os.path.join(_TESTS_DIR, "..", "..", "..", "examples", "patterns")
+)
+
+
+class ProceedBackend:
+    """Simulates all 5 gates scoring + compile_assessment returning proceed verdict.
+
+    For gate eval nodes (id='eval' inside conversational-gate.dot): returns preferred_label='scored'.
+    For compile_assessment: returns preferred_label='proceed'.
+    """
+
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    async def run(self, node: Node, prompt: str, context: PipelineContext) -> Outcome:
+        self.calls.append(node.id)
+        if node.id == "compile_assessment":
+            return Outcome(status=StageStatus.SUCCESS, preferred_label="proceed")
+        # Gate eval nodes (inside conversational-gate.dot subgraphs)
+        return Outcome(status=StageStatus.SUCCESS, preferred_label="scored")
+
+
+class CautionBackend:
+    """Simulates compile_assessment returning caution verdict.
+
+    For gate eval nodes: returns preferred_label='scored'.
+    For compile_assessment: returns preferred_label='caution'.
+    """
+
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    async def run(self, node: Node, prompt: str, context: PipelineContext) -> Outcome:
+        self.calls.append(node.id)
+        if node.id == "compile_assessment":
+            return Outcome(status=StageStatus.SUCCESS, preferred_label="caution")
+        return Outcome(status=StageStatus.SUCCESS, preferred_label="scored")
+
+
+class NotReadyBackend:
+    """Simulates compile_assessment returning not_ready verdict.
+
+    For gate eval nodes: returns preferred_label='scored'.
+    For compile_assessment: returns preferred_label='not_ready'.
+    """
+
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    async def run(self, node: Node, prompt: str, context: PipelineContext) -> Outcome:
+        self.calls.append(node.id)
+        if node.id == "compile_assessment":
+            return Outcome(status=StageStatus.SUCCESS, preferred_label="not_ready")
+        return Outcome(status=StageStatus.SUCCESS, preferred_label="scored")
+
+
+def _make_admissions_engine(
+    backend: object,
+    tmp_path: object,
+    patterns_dir: str,
+) -> PipelineEngine:
+    """Create a PipelineEngine for the admissions.dot graph with the given backend.
+
+    Parses admissions.dot, sets graph.source_dir to the foundry directory so that
+    folder nodes can resolve ../../patterns/conversational-gate.dot correctly, then
+    wires up a HandlerRegistry and PipelineEngine ready for test execution.
+
+    Args:
+        backend: Mock backend to use for codergen nodes.
+        tmp_path: Temporary directory for logs.
+        patterns_dir: Path to the patterns directory (used for path resolution context).
+
+    Returns:
+        A PipelineEngine configured to run admissions.dot.
+    """
+    import pathlib
+
+    with open(_ADMISSIONS_DOT) as f:
+        dot_source = f.read()
+    graph = parse_dot(dot_source)
+    # Set source_dir so PipelineHandler resolves '../../patterns/conversational-gate.dot'
+    # relative to the foundry directory.
+    graph.source_dir = _FOUNDRY_DIR
+
+    context = PipelineContext()
+    registry = HandlerRegistry(backend=backend)
+    return PipelineEngine(
+        graph=graph,
+        context=context,
+        handler_registry=registry,
+        logs_root=str(pathlib.Path(str(tmp_path)) / "logs"),
+    )
+
+
+class TestAdmissionsExecution:
+    """Execution tests for admissions.dot using mock backends (no real API calls)."""
+
+    @pytest.mark.asyncio
+    async def test_proceed_path_reaches_done_proceed(self, tmp_path):
+        """ProceedBackend causes pipeline to reach done_proceed terminal.
+
+        All 5 gates score successfully and compile_assessment returns 'proceed',
+        routing verdict_gate to done_proceed.
+        """
+        backend = ProceedBackend()
+        engine = _make_admissions_engine(backend, tmp_path, _PATTERNS_DIR)
+        outcome = await engine.run()
+
+        # Pipeline should complete successfully
+        assert outcome.status in (StageStatus.SUCCESS, StageStatus.PARTIAL_SUCCESS), (
+            f"Expected SUCCESS, got {outcome.status}. "
+            f"failure_reason={outcome.failure_reason!r}, notes={outcome.notes!r}"
+        )
+        # The verdict_gate must have been traversed (it sets preferred_label routing)
+        assert "verdict_gate" in engine.completed_nodes, (
+            f"Expected 'verdict_gate' in completed_nodes. "
+            f"completed_nodes={engine.completed_nodes}"
+        )
+        # Context preferred_label should be 'proceed' (set by compile_assessment)
+        # Note: terminal nodes (Msquare) are exit nodes - not added to completed_nodes.
+        # We verify the routing happened correctly via the context preferred_label.
+        assert engine.context.get("preferred_label") == "proceed", (
+            f"Expected preferred_label='proceed' in context, "
+            f"got {engine.context.get('preferred_label')!r}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_caution_path_reaches_done_caution(self, tmp_path):
+        """CautionBackend causes pipeline to reach done_caution terminal.
+
+        All 5 gates score successfully and compile_assessment returns 'caution',
+        routing verdict_gate to done_caution.
+        """
+        backend = CautionBackend()
+        engine = _make_admissions_engine(backend, tmp_path, _PATTERNS_DIR)
+        outcome = await engine.run()
+
+        assert outcome.status in (StageStatus.SUCCESS, StageStatus.PARTIAL_SUCCESS), (
+            f"Expected SUCCESS, got {outcome.status}. "
+            f"failure_reason={outcome.failure_reason!r}, notes={outcome.notes!r}"
+        )
+        assert "verdict_gate" in engine.completed_nodes, (
+            f"Expected 'verdict_gate' in completed_nodes. "
+            f"completed_nodes={engine.completed_nodes}"
+        )
+        # Note: terminal nodes (Msquare) are exit nodes - not added to completed_nodes.
+        # Verify routing via context preferred_label.
+        assert engine.context.get("preferred_label") == "caution", (
+            f"Expected preferred_label='caution' in context, "
+            f"got {engine.context.get('preferred_label')!r}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_not_ready_path_reaches_done_not_ready(self, tmp_path):
+        """NotReadyBackend causes pipeline to reach done_not_ready terminal.
+
+        All 5 gates score successfully and compile_assessment returns 'not_ready',
+        routing verdict_gate to done_not_ready.
+        """
+        backend = NotReadyBackend()
+        engine = _make_admissions_engine(backend, tmp_path, _PATTERNS_DIR)
+        outcome = await engine.run()
+
+        assert outcome.status in (StageStatus.SUCCESS, StageStatus.PARTIAL_SUCCESS), (
+            f"Expected SUCCESS, got {outcome.status}. "
+            f"failure_reason={outcome.failure_reason!r}, notes={outcome.notes!r}"
+        )
+        assert "verdict_gate" in engine.completed_nodes, (
+            f"Expected 'verdict_gate' in completed_nodes. "
+            f"completed_nodes={engine.completed_nodes}"
+        )
+        # Note: terminal nodes (Msquare) are exit nodes - not added to completed_nodes.
+        # Verify routing via context preferred_label.
+        assert engine.context.get("preferred_label") == "not_ready", (
+            f"Expected preferred_label='not_ready' in context, "
+            f"got {engine.context.get('preferred_label')!r}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_compile_assessment_is_called_after_five_gates(self, tmp_path):
+        """compile_assessment appears in completed_nodes after all 5 gates complete.
+
+        Verifies the sequential flow: gate1->gate2->gate3->gate4->gate5->compile_assessment.
+        All 5 gate folder nodes must appear before compile_assessment in the completed list.
+        """
+        backend = ProceedBackend()
+        engine = _make_admissions_engine(backend, tmp_path, _PATTERNS_DIR)
+        await engine.run()
+
+        completed = engine.completed_nodes
+        assert "compile_assessment" in completed, (
+            f"compile_assessment not found in completed_nodes: {completed}"
+        )
+
+        compile_idx = completed.index("compile_assessment")
+
+        # All 5 gates must appear before compile_assessment
+        for gate in ["gate1", "gate2", "gate3", "gate4", "gate5"]:
+            assert gate in completed, (
+                f"'{gate}' not found in completed_nodes: {completed}"
+            )
+            gate_idx = completed.index(gate)
+            assert gate_idx < compile_idx, (
+                f"'{gate}' (idx={gate_idx}) should appear before "
+                f"compile_assessment (idx={compile_idx})"
+            )
+
+        # compile_assessment was also called by the backend
+        assert "compile_assessment" in backend.calls, (
+            f"compile_assessment was not called by backend. calls={backend.calls}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_verdict_gate_is_traversed(self, tmp_path):
+        """verdict_gate is visited during every admissions pipeline run.
+
+        Confirms that the diamond node sits between compile_assessment and
+        the terminal node, regardless of which verdict path is taken.
+        """
+        backend = ProceedBackend()
+        engine = _make_admissions_engine(backend, tmp_path, _PATTERNS_DIR)
+        await engine.run()
+
+        assert "verdict_gate" in engine.completed_nodes, (
+            f"'verdict_gate' not found in completed_nodes: {engine.completed_nodes}"
+        )
+
+        # verdict_gate must appear after compile_assessment and before a done node
+        completed = engine.completed_nodes
+        verdict_idx = completed.index("verdict_gate")
+        compile_idx = completed.index("compile_assessment")
+        assert compile_idx < verdict_idx, (
+            f"compile_assessment (idx={compile_idx}) should appear before "
+            f"verdict_gate (idx={verdict_idx})"
+        )

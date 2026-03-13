@@ -35,7 +35,13 @@ import os
 
 import pytest
 
+from amplifier_module_loop_pipeline.context import PipelineContext
 from amplifier_module_loop_pipeline.dot_parser import parse_dot
+from amplifier_module_loop_pipeline.engine import PipelineEngine
+from amplifier_module_loop_pipeline.graph import Graph, Node
+from amplifier_module_loop_pipeline.handlers import HandlerRegistry
+from amplifier_module_loop_pipeline.interviewer import Answer, Option, QueueInterviewer  # noqa: F401
+from amplifier_module_loop_pipeline.outcome import Outcome, StageStatus
 
 # ---------------------------------------------------------------------------
 # Path helpers
@@ -407,4 +413,173 @@ class TestGenerateMachineParse:
         assert "gen_qa" in targets, (
             f"Expected qa_gate to have an edge to gen_qa (qa_enabled path). "
             f"Edges: {[(e.to_node, e.label) for e in qa_gate_edges]}"
+        )
+
+
+# ===========================================================================
+# TestGenerateMachineExecution -- generate-machine.dot engine execution tests
+# ===========================================================================
+
+# Path helpers for execution tests
+_FOUNDRY_DIR_GENERATE = os.path.abspath(
+    os.path.join(_TESTS_DIR, "..", "..", "..", "examples", "dev-machine", "foundry")
+)
+
+
+class MockToolHandlerGenerate:
+    """Mock tool handler for generate-machine.dot that injects context variables.
+
+    Handles design_check and qa_check nodes with configurable context values,
+    bypassing real shell command execution.
+    """
+
+    def __init__(
+        self,
+        design_exists: str = "false",
+        qa_enabled: str = "false",
+    ) -> None:
+        self._design_exists = design_exists
+        self._qa_enabled = qa_enabled
+
+    async def execute(
+        self,
+        node: Node,
+        context: PipelineContext,
+        graph: Graph,
+        logs_root: str,
+    ) -> Outcome:
+        if node.id == "design_check":
+            context.set("design_exists", self._design_exists)
+            return Outcome(
+                status=StageStatus.SUCCESS,
+                context_updates={"design_exists": self._design_exists},
+                notes=f"Mock tool: design_check -> design_exists={self._design_exists}",
+            )
+        if node.id == "qa_check":
+            context.set("qa_enabled", self._qa_enabled)
+            return Outcome(
+                status=StageStatus.SUCCESS,
+                context_updates={"qa_enabled": self._qa_enabled},
+                notes=f"Mock tool: qa_check -> qa_enabled={self._qa_enabled}",
+            )
+        # For any other tool nodes (e.g., validate in convergence-factory)
+        return Outcome(
+            status=StageStatus.SUCCESS,
+            notes=f"Mock tool: {node.id} passed",
+        )
+
+
+class GenerateConvergedBackend:
+    """Mock backend for generate-machine.dot that handles read_design and convergence-factory nodes.
+
+    For 'assess' nodes (inside convergence-factory.dot): returns preferred_label='converged'.
+    For all other codergen nodes: returns plain SUCCESS.
+    """
+
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    async def run(self, node: Node, prompt: str, context: PipelineContext) -> Outcome:
+        self.calls.append(node.id)
+        if node.id == "assess":
+            return Outcome(status=StageStatus.SUCCESS, preferred_label="converged")
+        return Outcome(status=StageStatus.SUCCESS, notes=f"Mock backend: {node.id}")
+
+
+class TestGenerateMachineExecution:
+    """Execution tests for generate-machine.dot using mock backends (no real API calls)."""
+
+    @pytest.mark.asyncio
+    async def test_design_missing_exits_early(self, tmp_path):
+        """When design_exists=false, pipeline exits to done_no_design without reaching read_design.
+
+        The design_check tool node returns design_exists=false, which causes
+        design_gate to route to done_no_design (early exit). The read_design
+        codergen node must NOT be reached.
+        """
+        import pathlib
+
+        with open(_GENERATE_MACHINE_DOT) as f:
+            dot_source = f.read()
+        graph = parse_dot(dot_source)
+        graph.source_dir = _FOUNDRY_DIR_GENERATE
+
+        context = PipelineContext()
+        # design_exists=false → early exit
+        tool_handler = MockToolHandlerGenerate(design_exists="false")
+        registry = HandlerRegistry(backend=GenerateConvergedBackend())
+        registry.register("tool", tool_handler)
+
+        engine = PipelineEngine(
+            graph=graph,
+            context=context,
+            handler_registry=registry,
+            logs_root=str(pathlib.Path(str(tmp_path)) / "logs"),
+        )
+        outcome = await engine.run()
+
+        # Pipeline should exit successfully via the early-exit path.
+        # Note: terminal nodes (Msquare / exit nodes) are NOT added to completed_nodes
+        # by the engine — the engine exits when it reaches them without recording them.
+        # We verify the early exit by checking the gate was traversed and the
+        # design_exists context variable is 'false'.
+        assert outcome.status in (StageStatus.SUCCESS, StageStatus.PARTIAL_SUCCESS), (
+            f"Expected SUCCESS on early exit, got {outcome.status}. "
+            f"failure_reason={outcome.failure_reason!r}, notes={outcome.notes!r}"
+        )
+        # design_gate must be traversed (confirms the routing decision was made)
+        assert "design_gate" in engine.completed_nodes, (
+            f"Expected 'design_gate' in completed_nodes. "
+            f"completed_nodes={engine.completed_nodes}"
+        )
+        # Context confirms design was flagged as missing
+        assert engine.context.get("design_exists") == "false", (
+            f"Expected design_exists='false' in context, "
+            f"got {engine.context.get('design_exists')!r}"
+        )
+        # read_design must NOT be reached (early exit before it)
+        assert "read_design" not in engine.completed_nodes, (
+            f"'read_design' should NOT be in completed_nodes for design-missing path. "
+            f"completed_nodes={engine.completed_nodes}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_qa_disabled_skips_gen_qa(self, tmp_path):
+        """When qa_enabled=false, gen_qa node is NOT visited.
+
+        The design_check returns design_exists=true so the pipeline continues.
+        The qa_check returns qa_enabled=false, which causes qa_gate to route
+        directly to gen_iteration (skipping gen_qa). Verifies gen_qa is absent
+        from completed_nodes.
+        """
+        import pathlib
+
+        with open(_GENERATE_MACHINE_DOT) as f:
+            dot_source = f.read()
+        graph = parse_dot(dot_source)
+        graph.source_dir = _FOUNDRY_DIR_GENERATE
+
+        context = PipelineContext()
+        # design_exists=true (continue), qa_enabled=false (skip gen_qa)
+        tool_handler = MockToolHandlerGenerate(design_exists="true", qa_enabled="false")
+        registry = HandlerRegistry(backend=GenerateConvergedBackend())
+        registry.register("tool", tool_handler)
+
+        engine = PipelineEngine(
+            graph=graph,
+            context=context,
+            handler_registry=registry,
+            logs_root=str(pathlib.Path(str(tmp_path)) / "logs"),
+        )
+        await engine.run()
+
+        # gen_qa must NOT be visited on the qa_disabled path
+        assert "gen_qa" not in engine.completed_nodes, (
+            f"'gen_qa' should NOT be in completed_nodes when qa_enabled=false. "
+            f"completed_nodes={engine.completed_nodes}"
+        )
+        # design_gate should route past done_no_design (design exists)
+        assert "done_no_design" not in engine.completed_nodes, (
+            f"Pipeline should not exit via done_no_design when design_exists=true. "
+            f"completed_nodes={engine.completed_nodes}"
         )

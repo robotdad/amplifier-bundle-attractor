@@ -30,7 +30,13 @@ import os
 
 import pytest
 
+from amplifier_module_loop_pipeline.context import PipelineContext
 from amplifier_module_loop_pipeline.dot_parser import parse_dot
+from amplifier_module_loop_pipeline.engine import PipelineEngine
+from amplifier_module_loop_pipeline.graph import Graph, Node
+from amplifier_module_loop_pipeline.handlers import HandlerRegistry
+from amplifier_module_loop_pipeline.interviewer import Answer, Option, QueueInterviewer  # noqa: F401
+from amplifier_module_loop_pipeline.outcome import Outcome, StageStatus
 
 # ---------------------------------------------------------------------------
 # Path helpers
@@ -433,4 +439,135 @@ class TestMachineDesignParse:
         assert len(chain) == 7, (
             f"Expected 7-node chain (phase1 through phase6 + done_complete), "
             f"got {len(chain)}: {chain}"
+        )
+
+
+# ===========================================================================
+# TestMachineDesignExecution -- machine-design.dot engine execution tests
+# ===========================================================================
+
+# Path helpers for execution tests
+_FOUNDRY_DIR_DESIGN = os.path.abspath(
+    os.path.join(_TESTS_DIR, "..", "..", "..", "examples", "dev-machine", "foundry")
+)
+
+
+class MockToolHandlerDesign:
+    """Mock tool handler that returns SUCCESS with assessment_exists='true' JSON.
+
+    Registered as the 'tool' handler in HandlerRegistry to replace the real
+    ToolHandler (which runs shell commands) during tests. Returns assessment_exists='true'
+    so the pipeline continues to phase1_config rather than exiting early.
+    """
+
+    async def execute(
+        self,
+        node: Node,
+        context: PipelineContext,
+        graph: Graph,
+        logs_root: str,
+    ) -> Outcome:
+        # Simulate assessment file exists by injecting assessment_exists=true
+        context.set("assessment_exists", "true")
+        return Outcome(
+            status=StageStatus.SUCCESS,
+            context_updates={"assessment_exists": "true"},
+            notes=f"Mock tool: {node.id} -> assessment_exists=true",
+        )
+
+
+class DesignConvergedBackend:
+    """Simulates all gate scoring and all convergence-factory phases converging.
+
+    For 'assess' nodes (inside convergence-factory.dot subgraph): returns preferred_label='converged'.
+    For all other codergen nodes: returns plain SUCCESS.
+    """
+
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    async def run(self, node: Node, prompt: str, context: PipelineContext) -> Outcome:
+        self.calls.append(node.id)
+        if node.id == "assess":
+            return Outcome(status=StageStatus.SUCCESS, preferred_label="converged")
+        return Outcome(status=StageStatus.SUCCESS, notes=f"Mock backend: {node.id}")
+
+
+class MockToolMissingAssessment:
+    """Mock tool handler that returns assessment_exists='false'.
+
+    Used for test_assessment_missing_exits_early to simulate the assessment file
+    being absent, which triggers the early exit to done_no_assessment.
+    """
+
+    async def execute(
+        self,
+        node: Node,
+        context: PipelineContext,
+        graph: Graph,
+        logs_root: str,
+    ) -> Outcome:
+        # Simulate assessment file does NOT exist
+        context.set("assessment_exists", "false")
+        return Outcome(
+            status=StageStatus.SUCCESS,
+            context_updates={"assessment_exists": "false"},
+            notes=f"Mock tool: {node.id} -> assessment_exists=false",
+        )
+
+
+class TestMachineDesignExecution:
+    """Execution tests for machine-design.dot using mock backends (no real API calls)."""
+
+    @pytest.mark.asyncio
+    async def test_assessment_missing_exits_early(self, tmp_path):
+        """When assessment_exists=false, pipeline exits to done_no_assessment without reaching phase1_config.
+
+        The assessment_check tool node returns assessment_exists=false, which causes
+        assessment_gate to route to done_no_assessment (early exit). The phase1_config
+        folder node (and any subsequent phases) must NOT be reached.
+        """
+        import pathlib
+
+        with open(_MACHINE_DESIGN_DOT) as f:
+            dot_source = f.read()
+        graph = parse_dot(dot_source)
+        graph.source_dir = _FOUNDRY_DIR_DESIGN
+
+        context = PipelineContext()
+        registry = HandlerRegistry(backend=DesignConvergedBackend())
+        # Override the 'tool' handler to simulate assessment missing
+        registry.register("tool", MockToolMissingAssessment())
+
+        engine = PipelineEngine(
+            graph=graph,
+            context=context,
+            handler_registry=registry,
+            logs_root=str(pathlib.Path(str(tmp_path)) / "logs"),
+        )
+        outcome = await engine.run()
+
+        # Pipeline should exit successfully via the early-exit path
+        # Note: terminal nodes (Msquare / exit nodes) are NOT added to completed_nodes
+        # by the engine — the engine exits when it reaches them without recording them.
+        # We verify the early exit by checking the gate was traversed and the
+        # assessment_exists context variable is 'false'.
+        assert outcome.status in (StageStatus.SUCCESS, StageStatus.PARTIAL_SUCCESS), (
+            f"Expected SUCCESS on early exit, got {outcome.status}. "
+            f"failure_reason={outcome.failure_reason!r}, notes={outcome.notes!r}"
+        )
+        # assessment_gate must be traversed (confirms the routing decision was made)
+        assert "assessment_gate" in engine.completed_nodes, (
+            f"Expected 'assessment_gate' in completed_nodes. "
+            f"completed_nodes={engine.completed_nodes}"
+        )
+        # Context confirms assessment was flagged as missing
+        assert engine.context.get("assessment_exists") == "false", (
+            f"Expected assessment_exists='false' in context, "
+            f"got {engine.context.get('assessment_exists')!r}"
+        )
+        # phase1_config must NOT be reached (early exit before it)
+        assert "phase1_config" not in engine.completed_nodes, (
+            f"'phase1_config' should NOT be in completed_nodes for assessment-missing path. "
+            f"completed_nodes={engine.completed_nodes}"
         )

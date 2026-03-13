@@ -1,5 +1,7 @@
 """Tests for post-session-accounting.py — Session counting and zero-change tracking."""
 
+import subprocess
+
 import yaml
 
 from conftest import SCRIPTS_DIR, parse_last_json, run_script
@@ -95,14 +97,7 @@ class TestPostSessionAccountingZeroChange:
 
     def test_zero_change_detection_with_same_head(self, tmp_path):
         """Detects zero-change session when HEAD matches last_session_head."""
-        # Use a fake HEAD that won't match any real git HEAD
-        # by pointing project_dir at a non-git directory so git fails (non-fatal)
-        # and last_session_head is set to a known value.
-        # Instead, we use a real git repo dir but patch by using an invalid dir
-        # so git errors (non-fatal). To test zero-change, we need git to succeed
-        # and return same HEAD. We'll use a git init in tmp_path.
-        import subprocess
-
+        # Create a real git repo so HEAD comparison can succeed.
         git_dir = tmp_path / "repo"
         git_dir.mkdir()
         subprocess.run(["git", "init", str(git_dir)], capture_output=True)

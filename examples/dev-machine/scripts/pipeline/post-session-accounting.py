@@ -39,6 +39,8 @@ def main() -> int:
 
     state_file = sys.argv[1]
     project_dir = sys.argv[2]
+    # sys.argv[3] (session_count) is accepted for API compatibility but not used here;
+    # session_count is derived from meta.session_count in STATE.yaml.
 
     try:
         with open(state_file) as f:
@@ -73,8 +75,6 @@ def main() -> int:
             meta["last_session_head"] = current_head
         except Exception:
             pass  # non-fatal: git unavailable or not a repo
-
-        state["meta"] = meta
 
         # Write updated STATE.yaml
         with open(state_file, "w") as f:

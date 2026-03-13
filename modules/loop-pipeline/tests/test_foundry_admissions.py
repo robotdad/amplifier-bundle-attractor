@@ -26,6 +26,8 @@ from __future__ import annotations
 
 import os
 
+import pytest
+
 from amplifier_module_loop_pipeline.dot_parser import parse_dot
 
 # ---------------------------------------------------------------------------
@@ -40,13 +42,9 @@ _ADMISSIONS_DOT = os.path.join(
 )
 
 
-def _load() -> str:
-    with open(_ADMISSIONS_DOT) as f:
-        return f.read()
-
-
 def _graph():
-    return parse_dot(_load())
+    with open(_ADMISSIONS_DOT) as f:
+        return parse_dot(f.read())
 
 
 # ===========================================================================
@@ -77,10 +75,10 @@ class TestAdmissionsParse:
         assert graph is not None
 
     # -----------------------------------------------------------------------
-    # AC-3: Exactly 10 nodes
+    # AC-3: Exactly 10 nodes (spec description actually yields 11)
     # -----------------------------------------------------------------------
 
-    def test_has_exactly_ten_nodes(self):
+    def test_has_eleven_nodes(self):
         """Exactly 11 nodes: start, gate1-5, compile_assessment, verdict_gate, 3 done terminals.
 
         Note: the spec description lists 11 distinct node elements
@@ -171,49 +169,17 @@ class TestAdmissionsParse:
     # AC-9..13: Gate topics cover all 5 areas
     # -----------------------------------------------------------------------
 
-    def test_gate_topics_contain_decomposability(self):
-        """At least one gate topic contains DECOMPOSABILITY."""
+    @pytest.mark.parametrize(
+        "keyword",
+        ["DECOMPOSABILITY", "CORRECTNESS", "ARCHITECTURE", "TOOLCHAIN", "SPEC"],
+    )
+    def test_gate_topics_contain_keyword(self, keyword: str):
+        """At least one gate topic contains the expected keyword."""
         graph = _graph()
         folder_nodes = [n for n in graph.nodes.values() if n.shape == "folder"]
         topics = [node.attrs.get("context.gate_topic", "") for node in folder_nodes]
-        assert any("DECOMPOSABILITY" in t for t in topics), (
-            f"Expected DECOMPOSABILITY in a gate topic. Topics: {topics}"
-        )
-
-    def test_gate_topics_contain_correctness(self):
-        """At least one gate topic contains CORRECTNESS."""
-        graph = _graph()
-        folder_nodes = [n for n in graph.nodes.values() if n.shape == "folder"]
-        topics = [node.attrs.get("context.gate_topic", "") for node in folder_nodes]
-        assert any("CORRECTNESS" in t for t in topics), (
-            f"Expected CORRECTNESS in a gate topic. Topics: {topics}"
-        )
-
-    def test_gate_topics_contain_architecture(self):
-        """At least one gate topic contains ARCHITECTURE."""
-        graph = _graph()
-        folder_nodes = [n for n in graph.nodes.values() if n.shape == "folder"]
-        topics = [node.attrs.get("context.gate_topic", "") for node in folder_nodes]
-        assert any("ARCHITECTURE" in t for t in topics), (
-            f"Expected ARCHITECTURE in a gate topic. Topics: {topics}"
-        )
-
-    def test_gate_topics_contain_toolchain(self):
-        """At least one gate topic contains TOOLCHAIN."""
-        graph = _graph()
-        folder_nodes = [n for n in graph.nodes.values() if n.shape == "folder"]
-        topics = [node.attrs.get("context.gate_topic", "") for node in folder_nodes]
-        assert any("TOOLCHAIN" in t for t in topics), (
-            f"Expected TOOLCHAIN in a gate topic. Topics: {topics}"
-        )
-
-    def test_gate_topics_contain_spec(self):
-        """At least one gate topic contains SPEC."""
-        graph = _graph()
-        folder_nodes = [n for n in graph.nodes.values() if n.shape == "folder"]
-        topics = [node.attrs.get("context.gate_topic", "") for node in folder_nodes]
-        assert any("SPEC" in t for t in topics), (
-            f"Expected SPEC in a gate topic. Topics: {topics}"
+        assert any(keyword in t for t in topics), (
+            f"Expected {keyword} in a gate topic. Topics: {topics}"
         )
 
     # -----------------------------------------------------------------------

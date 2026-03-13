@@ -184,9 +184,7 @@ class TestQAParse:
         """read_qa_state node has parse_json='true'."""
         graph = _graph_qa()
         val = graph.nodes["read_qa_state"].attrs.get("parse_json")
-        assert val == "true", (
-            f"Expected read_qa_state parse_json='true', got {val!r}"
-        )
+        assert val == "true", f"Expected read_qa_state parse_json='true', got {val!r}"
 
     # -----------------------------------------------------------------------
     # AC-8: blocked_gate is diamond
@@ -266,9 +264,8 @@ class TestQAParse:
         graph = _graph_qa()
         gate_edges = [e for e in graph.edges if e.from_node == "blocked_gate"]
         done_edges = [e for e in gate_edges if e.to_node == "done"]
-        assert done_edges, (
-            "Expected blocked_gate -> done edge. Edges: "
-            + str([(e.to_node, e.label, e.condition) for e in gate_edges])
+        assert done_edges, "Expected blocked_gate -> done edge. Edges: " + str(
+            [(e.to_node, e.label, e.condition) for e in gate_edges]
         )
         done_edge = done_edges[0]
         has_blocked = (done_edge.label and "blocked" in done_edge.label.lower()) or (
@@ -284,9 +281,8 @@ class TestQAParse:
         graph = _graph_qa()
         gate_edges = [e for e in graph.edges if e.from_node == "blocked_gate"]
         qa_loop_edges = [e for e in gate_edges if e.to_node == "qa_loop"]
-        assert qa_loop_edges, (
-            "Expected blocked_gate -> qa_loop edge. Edges: "
-            + str([(e.to_node, e.label, e.condition) for e in gate_edges])
+        assert qa_loop_edges, "Expected blocked_gate -> qa_loop edge. Edges: " + str(
+            [(e.to_node, e.label, e.condition) for e in gate_edges]
         )
         qa_edge = qa_loop_edges[0]
         has_testing = (qa_edge.label and "testing" in qa_edge.label.lower()) or (
@@ -419,17 +415,14 @@ class TestQAIterationParse:
         """orient node has shape=parallelogram."""
         graph = _graph_qa_iteration()
         assert graph.nodes["orient"].shape == "parallelogram", (
-            f"Expected orient shape=parallelogram, "
-            f"got {graph.nodes['orient'].shape!r}"
+            f"Expected orient shape=parallelogram, got {graph.nodes['orient'].shape!r}"
         )
 
     def test_orient_parse_json(self):
         """orient node has parse_json='true'."""
         graph = _graph_qa_iteration()
         val = graph.nodes["orient"].attrs.get("parse_json")
-        assert val == "true", (
-            f"Expected orient parse_json='true', got {val!r}"
-        )
+        assert val == "true", f"Expected orient parse_json='true', got {val!r}"
 
     # -----------------------------------------------------------------------
     # AC-7: orient_gate is diamond
@@ -478,9 +471,7 @@ class TestQAIterationParse:
         """post_qasession node has parse_json='true'."""
         graph = _graph_qa_iteration()
         val = graph.nodes["post_qasession"].attrs.get("parse_json")
-        assert val == "true", (
-            f"Expected post_qasession parse_json='true', got {val!r}"
-        )
+        assert val == "true", f"Expected post_qasession parse_json='true', got {val!r}"
 
     # -----------------------------------------------------------------------
     # AC-10: qa_session prompt contains required content
@@ -543,9 +534,7 @@ class TestQAIterationParse:
         """qa_session prompt uses $next_test reference."""
         graph = _graph_qa_iteration()
         prompt = graph.nodes["qa_session"].prompt
-        assert "$next_test" in prompt, (
-            "Expected '$next_test' in qa_session prompt"
-        )
+        assert "$next_test" in prompt, "Expected '$next_test' in qa_session prompt"
 
     def test_qa_session_prompt_no_jinja2(self):
         """qa_session prompt does NOT use Jinja2 {{...}} syntax."""
@@ -564,9 +553,8 @@ class TestQAIterationParse:
         graph = _graph_qa_iteration()
         gate_edges = [e for e in graph.edges if e.from_node == "orient_gate"]
         qa_edges = [e for e in gate_edges if e.to_node == "qa_session"]
-        assert qa_edges, (
-            "Expected orient_gate -> qa_session edge. Edges: "
-            + str([(e.to_node, e.label, e.condition) for e in gate_edges])
+        assert qa_edges, "Expected orient_gate -> qa_session edge. Edges: " + str(
+            [(e.to_node, e.label, e.condition) for e in gate_edges]
         )
         qa_edge = qa_edges[0]
         has_testing = (qa_edge.label and "testing" in qa_edge.label.lower()) or (
@@ -583,9 +571,8 @@ class TestQAIterationParse:
         graph = _graph_qa_iteration()
         gate_edges = [e for e in graph.edges if e.from_node == "orient_gate"]
         done_edges = [e for e in gate_edges if e.to_node == "done"]
-        assert done_edges, (
-            "Expected orient_gate -> done edge. Edges: "
-            + str([(e.to_node, e.label, e.condition) for e in gate_edges])
+        assert done_edges, "Expected orient_gate -> done edge. Edges: " + str(
+            [(e.to_node, e.label, e.condition) for e in gate_edges]
         )
         # At least one done edge should have 'done' label/condition
         done_labeled = [

@@ -166,9 +166,7 @@ class TestSmokeTestParse:
         """Each of the 5 check nodes has continue_on_fail='true'."""
         graph = _graph()
         val = graph.nodes[node_id].attrs.get("continue_on_fail")
-        assert val == "true", (
-            f"Expected {node_id} continue_on_fail='true', got {val!r}"
-        )
+        assert val == "true", f"Expected {node_id} continue_on_fail='true', got {val!r}"
 
     @pytest.mark.parametrize("node_id", CHECK_NODES)
     def test_check_nodes_are_parallelogram(self, node_id):

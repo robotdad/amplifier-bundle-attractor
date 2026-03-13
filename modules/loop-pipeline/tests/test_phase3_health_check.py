@@ -729,9 +729,7 @@ class TestFixIterationExecution:
         """
         capturing = _CapturingBackend()
         mock_tool = _MockToolHandler()
-        engine = self._make_engine(
-            tmp_path, tool_handler=mock_tool, backend=capturing
-        )
+        engine = self._make_engine(tmp_path, tool_handler=mock_tool, backend=capturing)
 
         await engine.run()
 

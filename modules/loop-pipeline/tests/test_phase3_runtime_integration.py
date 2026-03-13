@@ -33,9 +33,7 @@ from amplifier_module_loop_pipeline.dot_parser import parse_dot
 
 _TESTS_DIR = os.path.dirname(__file__)
 # From modules/loop-pipeline/tests/ -> up 3 levels -> amplifier-bundle-attractor/
-_EXAMPLES_DIR = os.path.abspath(
-    os.path.join(_TESTS_DIR, "..", "..", "..", "examples")
-)
+_EXAMPLES_DIR = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", "examples"))
 _RUNTIME_DIR = os.path.join(_EXAMPLES_DIR, "dev-machine", "runtime")
 
 # The 7 runtime DOT files that constitute the Phase 3 pipeline suite
@@ -51,16 +49,16 @@ _RUNTIME_DOT_FILES = [
 
 # Valid DOT shapes recognised by the pipeline engine
 _VALID_SHAPES = {
-    "Mdiamond",   # start
-    "Msquare",    # done/exit
+    "Mdiamond",  # start
+    "Msquare",  # done/exit
     "parallelogram",  # tool
-    "diamond",    # conditional gate
-    "box",        # codergen/LLM
-    "folder",     # nested pipeline
-    "house",      # manager loop
-    "ellipse",    # codergen (alternate)
-    "hexagon",    # human gate
-    "invtriangle",    # parallel fan-out
+    "diamond",  # conditional gate
+    "box",  # codergen/LLM
+    "folder",  # nested pipeline
+    "house",  # manager loop
+    "ellipse",  # codergen (alternate)
+    "hexagon",  # human gate
+    "invtriangle",  # parallel fan-out
     "trapezium",  # parallel fan-in
 }
 
@@ -89,9 +87,7 @@ class TestAllRuntimeDotsExist:
     def test_file_exists(self, filename: str):
         """Runtime DOT file exists at examples/dev-machine/runtime/{filename}."""
         path = _dot_path(filename)
-        assert os.path.isfile(path), (
-            f"Runtime DOT file not found: {path}"
-        )
+        assert os.path.isfile(path), f"Runtime DOT file not found: {path}"
 
 
 # ===========================================================================
@@ -186,8 +182,7 @@ class TestAllRuntimeDotsParse:
 
         unreachable = [nid for nid in graph.nodes if nid not in visited]
         assert not unreachable, (
-            f"{filename}: nodes unreachable from start ({start_id!r}): "
-            f"{unreachable}"
+            f"{filename}: nodes unreachable from start ({start_id!r}): {unreachable}"
         )
 
     # -----------------------------------------------------------------------
@@ -204,12 +199,10 @@ class TestAllRuntimeDotsParse:
             source = f.read()
 
         assert "{{" not in source, (
-            f"{filename}: found Jinja2 '{{{{' syntax -- "
-            "use $variable notation instead"
+            f"{filename}: found Jinja2 '{{{{' syntax -- use $variable notation instead"
         )
         assert "}}" not in source, (
-            f"{filename}: found Jinja2 '}}}}' syntax -- "
-            "use $variable notation instead"
+            f"{filename}: found Jinja2 '}}}}' syntax -- use $variable notation instead"
         )
 
 
@@ -321,11 +314,8 @@ class TestAgentPromptsVerbatim:
         ]
 
         missing = [
-            node_id
-            for node_id, prompt in checks
-            if "SAFETY CONSTRAINTS" not in prompt
+            node_id for node_id, prompt in checks if "SAFETY CONSTRAINTS" not in prompt
         ]
         assert not missing, (
-            f"The following agent prompts are missing 'SAFETY CONSTRAINTS': "
-            f"{missing}"
+            f"The following agent prompts are missing 'SAFETY CONSTRAINTS': {missing}"
         )

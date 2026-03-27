@@ -14,7 +14,7 @@ bundle:
 
 includes:
   - bundle: attractor:behaviors/attractor-core
-  - bundle: git+https://github.com/bkrabach/amplifier-bundle-env-all@main#subdirectory=behaviors/env-all.yaml
+  - bundle: git+https://github.com/microsoft/amplifier-bundle-execution-environments@main#subdirectory=behaviors/env-all.yaml
 
 providers:
   - module: provider-gemini

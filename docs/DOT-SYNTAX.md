@@ -27,6 +27,7 @@ digraph {
 | `parallelogram` | tool | Direct tool invocation (no LLM) | No |
 | `hexagon` | wait.human | Pauses for human approval before proceeding | No |
 | `house` | stack.manager_loop | Nested sub-pipeline (supervisor cycle) | No |
+| `folder` | pipeline | Sub-pipeline from external DOT file | No |
 
 ## Node Attributes Quick Reference
 
@@ -43,6 +44,9 @@ digraph {
 | `auto_status` | bool | false | Force SUCCESS regardless of outcome |
 | `timeout` | string | -- | Per-node timeout (e.g. "30s", "2m") |
 | `class` | string | -- | CSS class for model stylesheet matching |
+| `dot_file` | string | -- | Path to child DOT file (folder nodes only) |
+| `outputs` | string | -- | Comma-separated child context keys to merge back (folder nodes only) |
+| `context.*` | string | -- | Inject named values into child context (folder nodes only) |
 
 ## Edge Attributes Quick Reference
 
@@ -135,6 +139,20 @@ digraph {
     work [prompt="$goal"]
     review [shape=hexagon, label="Human Review"]
     start -> work -> review -> done
+}
+```
+
+### Sub-Pipeline (Folder)
+```dot
+digraph {
+    start [shape=Mdiamond]; done [shape=Msquare]
+    prepare [prompt="Prepare inputs for sub-pipeline"]
+    sub [shape=folder,
+         dot_file="pipelines/child.dot",
+         "context.goal"="$goal",
+         outputs="result"]
+    finish [prompt="Use $result from sub-pipeline"]
+    start -> prepare -> sub -> finish -> done
 }
 ```
 

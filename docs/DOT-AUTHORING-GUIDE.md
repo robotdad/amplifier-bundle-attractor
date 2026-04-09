@@ -270,6 +270,71 @@ digraph {
 When the pipeline reaches a hexagon node, it pauses and presents the edge
 labels as choices. The human selects one, and the pipeline follows that edge.
 
+### Sub-Pipeline Composition (Folder)
+
+Use `shape=folder` to invoke a child pipeline defined in a separate DOT file.
+The folder node runs the referenced pipeline as a sub-pipeline, passing context
+from the parent, and optionally merging declared outputs back on success.
+
+```dot
+digraph {
+    graph [goal="Build and validate a Python library"]
+
+    start [shape=Mdiamond]
+    done  [shape=Msquare]
+
+    implement [prompt="Implement the library for: $goal"]
+    test [prompt="Write unit tests for the library."]
+
+    validate [
+        shape=folder,
+        label="Run Validation Suite",
+        dot_file="pipelines/validate.dot",
+        context.target="library",
+        context.goal="$goal",
+        outputs="validation_report,passed"
+    ]
+
+    gate [shape=diamond, label="Passed?"]
+    fix [prompt="Fix issues identified in the validation report."]
+
+    start -> implement -> test -> validate -> gate
+    gate -> done [condition="outcome=success", weight=10]
+    gate -> fix  [condition="outcome!=success", weight=5]
+    fix -> test
+}
+```
+
+**Folder node attributes:**
+
+| Attribute | Required | Default | Description |
+|-----------|----------|---------|-------------|
+| `dot_file` | Yes | — | Path to the child pipeline DOT file |
+| `context.<key>` | No | — | Inject named values into the child context (`context.goal="$goal"`) |
+| `outputs` | No | `""` | Comma-separated child context keys to merge back into parent on success |
+
+**Context flow:**
+
+1. **Parent → Child (clone + inject):** When the folder node executes, the
+   engine clones the parent pipeline context and injects any `context.<key>`
+   attributes as named values. The child pipeline runs with this enriched
+   context.
+
+2. **Child → Parent (only declared outputs on success):** When the child
+   pipeline completes successfully, only the context keys listed in `outputs`
+   are merged back into the parent context. Keys not listed in `outputs` are
+   discarded.
+
+3. **Isolation (undeclared changes don't affect parent):** Any context
+   modifications made inside the child pipeline that are not declared in
+   `outputs` do not affect the parent pipeline's context. This isolation
+   prevents accidental side-effects from leaking across pipeline boundaries.
+
+**Path resolution for `dot_file`:** Relative paths are resolved relative to
+the parent DOT file's directory. Absolute paths are used as-is. For example,
+if the parent pipeline is at `pipelines/main.dot` and `dot_file="validate.dot"`,
+the engine looks for `pipelines/validate.dot`.
+
 ### Manager-Supervisor Pattern
 
 Use `shape=house` for a supervisor that oversees a sub-pipeline through
@@ -346,6 +411,7 @@ Every node in a DOT pipeline can have these attributes:
 | `hexagon` | `wait.human` | No | Human approval gate |
 | `parallelogram` | `tool` | No | External tool/shell execution |
 | `house` | `stack.manager_loop` | Yes | Supervisor loop over sub-pipeline |
+| `folder` | `pipeline` | No | Sub-pipeline from external DOT file |
 
 ## Edge Attribute Reference
 

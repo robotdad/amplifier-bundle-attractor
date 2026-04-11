@@ -20,13 +20,11 @@ digraph {
 | `Mdiamond` | start | Pipeline entry point | No |
 | `Msquare` | exit | Pipeline exit, triggers goal gates | No |
 | `box` | codergen | LLM agent with full tool access | Yes |
-| `ellipse` | codergen | Alias for box | Yes |
-| `diamond` | conditional | Routing node — no LLM call, evaluates edge conditions | No |
 | `component` | parallel | Runs all outgoing edges concurrently | No |
 | `tripleoctagon` | parallel.fan_in | Collects results from parallel branches | No |
 | `parallelogram` | tool | Direct tool invocation (no LLM) | No |
 | `hexagon` | wait.human | Pauses for human approval before proceeding | No |
-| `house` | stack.manager_loop | Nested sub-pipeline (supervisor cycle) | No |
+| `house` | stack.manager_loop | Nested sub-pipeline (supervisor cycle) (experimental) | No |
 | `folder` | pipeline | Sub-pipeline from external DOT file | No |
 
 ## Node Attributes Quick Reference
@@ -75,7 +73,6 @@ digraph {
 ```dot
 graph [model_stylesheet="
     box { llm_provider: anthropic; llm_model: claude-sonnet-4-20250514 }
-    ellipse { llm_provider: openai; llm_model: o3-mini; reasoning_effort: high }
     .fast { llm_model: claude-haiku-3-5-20241022 }
 "]
 ```
@@ -162,10 +159,10 @@ digraph {
     graph [
         goal="$goal",
         model_stylesheet="box { llm_provider: anthropic; llm_model: claude-sonnet-4-20250514 }
-                          ellipse { llm_provider: openai; llm_model: o3-mini; reasoning_effort: high }"
+                          .reasoning { llm_provider: openai; llm_model: o3-mini; reasoning_effort: high }"
     ]
     start [shape=Mdiamond]; done [shape=Msquare]
-    plan [shape=ellipse, prompt="Create a plan for: $goal"]
+    plan [class="reasoning", prompt="Create a plan for: $goal"]
     implement [prompt="Execute the plan"]
     start -> plan -> implement -> done
 }

@@ -13,7 +13,7 @@
 //
 // Routing logic:
 //   assess codergen sets preferred_label="converged" or preferred_label="refine"
-//   check diamond routes via context.preferred_label conditions
+//   check node routes via context.preferred_label edge conditions
 //   feedback -> generate edge has loop_restart=true to reset iteration state
 
 digraph convergence_factory {
@@ -46,9 +46,9 @@ digraph convergence_factory {
         prompt="You are assessing whether an artifact meets quality criteria.\n\nArtifact goal: $artifact_goal\n\nValidation criteria: $validation_criteria\n\nReview the artifact at $artifact_path and the validation results.\nDetermine whether the artifact fully satisfies all of the validation criteria.\n\nIf it fully meets the criteria: return outcome 'converged'.\nIf it needs further improvement: return outcome 'refine'.\n\nWrite a brief assessment summary to .ai/assessment.md before returning."
     ]
 
-    // check: diamond routing node.
+    // check: routing node (edge conditions handle routing per nlspec Section 3.3).
     // Routes to 'done' when assess says converged, to 'feedback' when refine.
-    check [shape=diamond, label="Converged?"]
+    check [shape=parallelogram, label="Converged?", tool_command="echo routing"]
 
     // feedback: reached only when assess returns 'refine'.
     // Reads the assessment and all prior feedback, then writes targeted

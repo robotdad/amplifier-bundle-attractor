@@ -62,7 +62,8 @@ digraph {
 
 ### Conditional Routing
 
-Use `shape=diamond` for decision points. The diamond node itself is a no-op --
+Conditional routing is done via `condition=` attributes on edges, which work
+from **any node type** (per nlspec Section 3.3). No special shape is needed --
 the engine evaluates `condition` attributes on outgoing edges to pick the path.
 
 ```dot
@@ -72,13 +73,12 @@ digraph {
     start     [shape=Mdiamond]
     implement [prompt="Write a URL shortener with shorten() and expand() for: $goal"]
     test      [prompt="Write and run tests. Report success or failure."]
-    gate      [shape=diamond, label="Tests Pass?"]
     fix       [prompt="Tests failed. Review output and fix the implementation."]
     done      [shape=Msquare]
 
-    start -> implement -> test -> gate
-    gate -> done [condition="outcome=success", weight=10]
-    gate -> fix  [condition="outcome!=success", weight=5]
+    start -> implement -> test
+    test -> done [condition="outcome=success", weight=10]
+    test -> fix  [condition="outcome!=success", weight=5]
     fix -> test
 }
 ```
@@ -295,12 +295,11 @@ digraph {
         outputs="validation_report,passed"
     ]
 
-    gate [shape=diamond, label="Passed?"]
     fix [prompt="Fix issues identified in the validation report."]
 
-    start -> implement -> test -> validate -> gate
-    gate -> done [condition="outcome=success", weight=10]
-    gate -> fix  [condition="outcome!=success", weight=5]
+    start -> implement -> test -> validate
+    validate -> done [condition="outcome=success", weight=10]
+    validate -> fix  [condition="outcome!=success", weight=5]
     fix -> test
 }
 ```
@@ -361,14 +360,13 @@ digraph {
 
     implement [prompt="Implement the data pipeline. Incorporate steering feedback."]
     test [prompt="Run tests. Report success or failure."]
-    gate [shape=diamond, label="Pass?"]
     report [prompt="Summarize results."]
 
     start -> plan -> manager
     manager -> implement
-    implement -> test -> gate
-    gate -> done [condition="outcome=success"]
-    gate -> implement [condition="outcome!=success"]
+    implement -> test
+    test -> done [condition="outcome=success"]
+    test -> implement [condition="outcome!=success"]
     manager -> report [weight=0]
     report -> done
 }
@@ -405,12 +403,11 @@ Every node in a DOT pipeline can have these attributes:
 | `Mdiamond` | `start` | No | Pipeline entry point (required) |
 | `Msquare` | `exit` | No | Pipeline exit point (required) |
 | `box` | `codergen` | Yes | LLM task node (default for all nodes) |
-| `diamond` | `conditional` | No | Routing gate (evaluates edge conditions) |
 | `component` | `parallel` | No | Parallel fan-out |
 | `tripleoctagon` | `parallel.fan_in` | Optional | Collects parallel branch results |
 | `hexagon` | `wait.human` | No | Human approval gate |
 | `parallelogram` | `tool` | No | External tool/shell execution |
-| `house` | `stack.manager_loop` | Yes | Supervisor loop over sub-pipeline |
+| `house` | `stack.manager_loop` | Yes | Supervisor loop over sub-pipeline (experimental — future form TBD) |
 | `folder` | `pipeline` | No | Sub-pipeline from external DOT file |
 
 ## Edge Attribute Reference
@@ -578,8 +575,6 @@ digraph FeatureBuild {
         retry_target="integration",
         max_retries=3
     ]
-    gate [shape=diamond, label="Tests Pass?"]
-
     // Human review
     review [shape=hexagon, label="Ship or Rework?"]
 
@@ -591,9 +586,9 @@ digraph FeatureBuild {
     impl_core -> collect
     impl_api -> collect
     impl_tests -> collect
-    collect -> integration -> gate
-    gate -> review [condition="outcome=success"]
-    gate -> integration [condition="outcome!=success", label="fix"]
+    collect -> integration
+    integration -> review [condition="outcome=success"]
+    integration -> integration [condition="outcome!=success", label="fix"]
     review -> done [label="[S] Ship"]
     review -> integration [label="[R] Rework"]
 }

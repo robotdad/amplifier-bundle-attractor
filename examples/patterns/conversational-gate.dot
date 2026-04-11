@@ -15,7 +15,7 @@
 //
 // Routing logic:
 //   eval codergen sets preferred_label="scored" or preferred_label="need_more"
-//   check diamond routes via context.preferred_label conditions
+//   check node routes via context.preferred_label edge conditions
 
 digraph conversational_gate {
     graph [goal="Iterative human Q&A gate: loop until sufficient evidence"]
@@ -41,9 +41,9 @@ digraph conversational_gate {
         prompt="You are evaluating a conversational gate.\n\nGate topic: $gate_topic\n\nEvaluation criteria: $gate_criteria\n\nThe human has just responded (their selection is in context). Based on the conversation so far and the criteria above, decide:\n- If sufficient evidence has been provided: return outcome 'scored'\n- If more detail is needed: return outcome 'need_more'\n\nPrevious context: $context"
     ]
 
-    // check: diamond routing node.
+    // check: routing node (edge conditions handle routing per nlspec Section 3.3).
     // Routes to 'done' when eval says scored, loops back to 'ask' when need_more.
-    check [shape=diamond, label="Sufficient?"]
+    check [shape=parallelogram, label="Sufficient?", tool_command="echo routing"]
 
     // done: terminal node
     done [shape=Msquare, label="Gate Done"]

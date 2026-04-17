@@ -24,7 +24,7 @@ digraph {
 | `tripleoctagon` | parallel.fan_in | Collects results from parallel branches | No |
 | `parallelogram` | tool | Direct tool invocation (no LLM) | No |
 | `hexagon` | wait.human | Pauses for human approval before proceeding | No |
-| `house` | stack.manager_loop | Nested sub-pipeline (supervisor cycle) (experimental) | No |
+| `house` | stack.manager_loop | Nested sub-pipeline (supervisor cycle) (experimental) | Indirect |
 | `folder` | pipeline | Sub-pipeline from external DOT file | No |
 
 ## Node Attributes Quick Reference

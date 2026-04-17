@@ -407,7 +407,7 @@ Every node in a DOT pipeline can have these attributes:
 | `tripleoctagon` | `parallel.fan_in` | Optional | Collects parallel branch results |
 | `hexagon` | `wait.human` | No | Human approval gate |
 | `parallelogram` | `tool` | No | External tool/shell execution |
-| `house` | `stack.manager_loop` | Yes | Supervisor loop over sub-pipeline (experimental — future form TBD) |
+| `house` | `stack.manager_loop` | Indirect | Supervisor loop over sub-pipeline (experimental — future form TBD); engine classifies as non-LLM for validation, but handler internally delegates to LLM |
 | `folder` | `pipeline` | No | Sub-pipeline from external DOT file |
 
 ## Edge Attribute Reference
@@ -505,7 +505,7 @@ Set these on the `graph` element:
 | `label` | String | `""` | Display name for the pipeline. |
 | `model_stylesheet` | String | `""` | CSS-like model assignment rules. |
 | `default_fidelity` | String | `compact` | Default context fidelity for all nodes. |
-| `default_max_retry` | Integer | `50` | Global retry ceiling. |
+| `default_max_retry` | Integer | `0` | Global retry ceiling. |
 | `retry_target` | String | `""` | Global retry target when exit has unsatisfied goal gates. |
 | `fallback_retry_target` | String | `""` | Global fallback retry target. |
 

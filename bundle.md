@@ -111,11 +111,18 @@ attractor/
 │   ├── tool-pipeline-run/      # Runtime pipeline invocation tool
 │   ├── tool-report-outcome/    # Pipeline outcome reporting tool
 │   ├── tool-apply-patch/       # Patch-based file editing (OpenAI)
-│   └── hooks-tool-truncation/  # Tool output truncation hook
+│   ├── hooks-tool-truncation/  # Tool output truncation hook
+│   ├── hooks-pipeline-progress/ # Pipeline progress reporting hook
+│   ├── hooks-pipeline-observability/ # Pipeline observability hooks
+│   ├── tool-dashboard-query/   # Pipeline status queries via HTTP API
+│   ├── tool-pipeline-status/   # Returns pipeline execution state
+│   └── unified-llm-client/     # Multi-provider LLM client library
 ├── context/                    # System prompts per provider
 │   ├── system-anthropic.md
 │   ├── system-openai.md
 │   ├── system-gemini.md
-│   └── pipeline-awareness.md   # Pipeline tool usage context
+│   ├── pipeline-awareness.md   # Pipeline tool usage context
+│   ├── dot-reference.md        # DOT syntax reference
+│   └── isolated-environment-guidance.md  # Isolated execution guidance
 └── examples/pipelines/         # Example DOT pipeline graphs
 ```

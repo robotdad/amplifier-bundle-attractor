@@ -265,7 +265,7 @@ async def main():
 
     # Register session.spawn so pipeline nodes get full sub-sessions
     # (See examples/programmatic_usage.py for the spawn capability impl)
-    from examples.programmatic_usage import register_spawn_capability
+    # See examples/programmatic_usage.py for register_spawn_capability implementation
     register_spawn_capability(session, prepared)
 
     async with session:
@@ -279,7 +279,7 @@ The key difference: with `session.spawn` registered, the `AmplifierBackend` kick
 in and each pipeline node gets a full child session with tools (filesystem, bash,
 search). Without it, you get `DirectProviderBackend` (LLM-only, no tools).
 
-See `amplifier-foundation/examples/07_full_workflow.py` for the reference
+See [`amplifier-foundation/examples/07_full_workflow.py`](https://github.com/microsoft/amplifier-foundation/blob/main/examples/07_full_workflow.py) for the reference
 `register_spawn_capability()` implementation. For a comprehensive guide,
 see [App Integration Guide](docs/APP-INTEGRATION-GUIDE.md).
 
@@ -301,7 +301,7 @@ delegate to attractor:attractor-expert
 
 ### Layers
 
-- **attractor-core** (behavior): Provider-agnostic tools and hooks shared by all profiles. Includes `tool-report-outcome`, `hooks-tool-truncation`, and `hooks-pipeline-progress`.
+- **attractor-core** (behavior): Provider-agnostic tools and hooks shared by all profiles. Includes `tool-report-outcome`, `hooks-tool-truncation`, `hooks-pipeline-progress`, and `hooks-pipeline-observability`.
 - **Profiles**: Each profile includes `attractor-core` and adds a provider, orchestrator (`loop-agent`), provider-specific tools, and a system prompt.
 - **Modules**: Self-contained Amplifier modules in `modules/`, each independently testable with its own `pyproject.toml`.
 
@@ -330,7 +330,10 @@ amplifier-bundle-attractor/
 │   ├── tool-report-outcome/     # Structured outcome reporting tool
 │   ├── tool-pipeline-run/       # Runtime pipeline invocation tool
 │   ├── hooks-tool-truncation/   # Tool output truncation hook
-│   └── hooks-pipeline-progress/ # Pipeline progress reporting hook
+│   ├── hooks-pipeline-progress/ # Pipeline progress reporting hook
+│   ├── hooks-pipeline-observability/ # Pipeline observability hooks (state aggregator, status bar, event persistence)
+│   ├── tool-dashboard-query/    # Pipeline status queries and management via HTTP API
+│   └── tool-pipeline-status/   # Returns pipeline execution state
 └── docs/
     └── DOT-SYNTAX.md            # DOT syntax reference
 ```
@@ -347,6 +350,9 @@ amplifier-bundle-attractor/
 | `tool-pipeline-run` | tool | Runtime pipeline invocation via session.spawn |
 | `hooks-tool-truncation` | hook | Truncates large tool outputs to manage context window |
 | `hooks-pipeline-progress` | hook | Reports pipeline stage progress |
+| `hooks-pipeline-observability` | hook | Pipeline observability hooks — state aggregator, status bar, and event persistence |
+| `tool-dashboard-query` | tool | Pipeline status queries and management via HTTP API |
+| `tool-pipeline-status` | tool | Returns pipeline execution state |
 
 ### Backend Selection
 
@@ -366,10 +372,14 @@ Each module is independently testable:
 cd modules/loop-agent && uv run pytest tests/ -q
 cd modules/loop-pipeline && uv run pytest tests/ -q
 cd modules/tool-apply-patch && uv run pytest tests/ -q
+cd modules/unified-llm-client && uv run pytest tests/ -q
 cd modules/tool-report-outcome && uv run pytest tests/ -q
 cd modules/tool-pipeline-run && uv run pytest tests/ -q
 cd modules/hooks-tool-truncation && uv run pytest tests/ -q
 cd modules/hooks-pipeline-progress && uv run pytest tests/ -q
+cd modules/hooks-pipeline-observability && uv run pytest tests/ -q
+cd modules/tool-dashboard-query && uv run pytest tests/ -q
+cd modules/tool-pipeline-status && uv run pytest tests/ -q
 ```
 
 Run all modules:

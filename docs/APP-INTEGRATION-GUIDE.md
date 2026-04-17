@@ -450,7 +450,6 @@ When composing bundles for isolated execution, follow these rules:
 | `last_response` truncated to 200 chars | Nodes lose full prior output under `compact`/`truncate` fidelity | Use `fidelity="full"` for nodes needing complete prior context |
 | `DirectProviderBackend` nodes have no tools | Cannot read/write files or run commands | Use Path B (AmplifierSession) for coding pipelines |
 | Provider model in global settings overrides bundle | Unexpected model selection | Use project-level `.amplifier/settings.yaml` |
-| No execution environment isolation | All nodes run on the host filesystem | Environment integration is a future phase |
 | `PreparedBundle.spawn()` returns string | Requires JSON-in-string parsing for structured results | The engine handles this internally |
 
 ## Further Reading

@@ -9,17 +9,15 @@ Quick reference for generating Attractor DOT pipelines.
 | `Mdiamond` | start | Entry point -- exactly one per graph |
 | `Msquare` | exit | Terminal -- triggers goal-gate check |
 | `box` | codergen | Default. LLM agent with tools (code, files, bash) |
-| `ellipse` | codergen | Same as box (alias for readability) |
-| `diamond` | conditional | Routing node -- no LLM call, evaluates edge conditions |
 | `component` | parallel | Fan-out: runs all outgoing edges concurrently |
 | `tripleoctagon` | parallel.fan_in | Fan-in: collects parallel branch results |
 | `parallelogram` | tool | Direct tool invocation (no LLM) |
 | `hexagon` | wait.human | Pauses for human approval before proceeding |
 | `house` | stack.manager_loop | Nested sub-pipeline (advanced) |
 
-**Important:** `diamond` is a pure router -- it does NOT call an LLM. Place your
-LLM work in a `box` node *before* the diamond, then use the diamond to branch on
-the outcome.
+**Routing via edge conditions:** There is no separate routing/diamond shape.
+Use `condition=` attributes on outgoing edges from any node to control flow.
+Put your logic in a `box` node, then attach conditional edges to route on outcome.
 
 ## Essential Node Attributes
 
@@ -75,7 +73,7 @@ CSS-like rules that apply attributes to nodes by shape or class:
 shape_or_class { property: value; property: value; }
 ```
 
-Selectors: `box`, `ellipse`, `diamond`, `.my_class` (via `class="my_class"` on node).
+Selectors: `box`, `hexagon`, `parallelogram`, or any shape name; `.my_class` (via `class="my_class"` on node).
 Properties: `llm_provider`, `llm_model`, `reasoning_effort`, `max_retries`, `fidelity`.
 
 ## Condition Expression Syntax
@@ -109,10 +107,9 @@ digraph {
     start [shape=Mdiamond]; done [shape=Msquare]
     implement [prompt="$goal", goal_gate=true, retry_target="implement", max_retries=3]
     test [prompt="Run tests"]
-    gate [shape=diamond]
-    start -> implement -> test -> gate
-    gate -> done [condition="outcome=success"]
-    gate -> implement [condition="outcome!=success", label="retry"]
+    start -> implement -> test
+    test -> done [condition="outcome=success"]
+    test -> implement [condition="outcome!=success", label="retry"]
 }
 ```
 

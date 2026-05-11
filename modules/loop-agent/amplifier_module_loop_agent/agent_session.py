@@ -173,7 +173,7 @@ class AgentSession:
         reasoning = self._extract_reasoning(response)
         reasoning_sig = self._extract_reasoning_signature(response)
         usage = response.usage
-        usage_data = usage.model_dump() if usage else {}
+        usage_data = usage.model_dump(mode="json") if usage else {}
         response_id = self._extract_response_id(response)
 
         tool_calls: list[dict[str, Any]] = []
@@ -240,7 +240,15 @@ class AgentSession:
             # Capture usage data
             chunk_usage = chunk.get("usage")
             if chunk_usage:
-                usage_data = chunk_usage
+                # Coerce to JSON-safe dict; handles Decimal cost_usd from streaming providers
+                if hasattr(chunk_usage, "model_dump"):
+                    usage_data = chunk_usage.model_dump(mode="json")
+                else:
+                    from decimal import Decimal as _Decimal
+                    usage_data = {
+                        k: float(v) if isinstance(v, _Decimal) else v
+                        for k, v in chunk_usage.items()
+                    }
 
         # Emit text end with full assembled text and reasoning
         text_end_data: dict[str, Any] = {"text": full_text}

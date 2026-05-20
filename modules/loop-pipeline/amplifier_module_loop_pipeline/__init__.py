@@ -218,18 +218,41 @@ class DirectProviderBackend:
         )
 
         # Map GenerateResult → Outcome
-        # Check report_outcome tool's last_outcome first — same logic as
-        # AmplifierBackend._run_with_tool_loop().  When extended thinking is
-        # active the model may call report_outcome as a terminal action with no
-        # subsequent text turn, leaving result.text empty.  Without this check
-        # the empty-text branch fires and hardcodes SUCCESS, discarding the
-        # structured verdict and any context_updates.
+        #
+        # Priority order (mirrors AmplifierBackend._run_with_tool_loop):
+        #   1. result.text contains JSON-like content → authoritative; reset stale tool state
+        #   2. result.text is plain prose or empty → fall back to report_outcome last_outcome
+        #   3. last_outcome also absent → plain prose → SUCCESS (spec 4.5) or empty → SUCCESS
+        import re as _re
+
         report_outcome_tool = self._tools.get("report_outcome")
+        text = result.text
+
+        if text:
+            stripped = text.strip()
+            _fence_match = _re.match(
+                r"^```(?:json)?\s*([\s\S]*?)\s*```$", stripped, _re.DOTALL
+            )
+            is_json_like = bool(_fence_match) or stripped.startswith("{")
+            if is_json_like:
+                # Structured output in text — authoritative; discard stale tool state
+                if report_outcome_tool:
+                    report_outcome_tool.last_outcome = None
+                outcome = _parse_outcome(text)
+                outcome.context_updates = {
+                    "last_stage": node.id,
+                    "last_response": text[:200],
+                }
+                self._completed_nodes[node.id] = outcome
+                self._last_node_id = node.id
+                return outcome
+
+        # Text is plain prose or empty — fall back to tool-reported outcome if present
         if report_outcome_tool and getattr(report_outcome_tool, "last_outcome", None):
             lo = report_outcome_tool.last_outcome
             report_outcome_tool.last_outcome = None  # reset — must happen before return
             outcome = Outcome(
-                status=_STATUS_MAP.get(lo.get("status"), StageStatus.SUCCESS),
+                status=_STATUS_MAP.get(lo.get("status"), StageStatus.FAIL),
                 context_updates=lo.get("context_updates"),
                 failure_reason=lo.get("failure_reason"),
                 preferred_label=lo.get("preferred_label"),
@@ -240,7 +263,6 @@ class DirectProviderBackend:
             self._last_node_id = node.id
             return outcome
 
-        text = result.text
         if text:
             outcome = _parse_outcome(text)
         else:

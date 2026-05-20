@@ -1083,3 +1083,42 @@ async def test_build_unified_tools_falls_back_to_input_schema():
     assert "properties" in tools[0].parameters
     assert "status" in tools[0].parameters["properties"]
     assert tools[0].parameters.get("required") == ["status"]
+
+
+@pytest.mark.asyncio
+async def test_tool_loop_report_outcome_json_text_wins_over_last_outcome():
+    """JSON text response takes precedence over last_outcome; stale tool state is reset.
+
+    A model without extended thinking may call report_outcome AND produce a JSON
+    text response.  The text is authoritative; last_outcome from the tool call
+    must be discarded (reset to None) and not returned as the outcome.
+    """
+    report_tool = _MockReportOutcomeTool()
+
+    mock_client = _MockUnifiedClient([
+        # Round 1: model calls report_outcome (sets last_outcome via execute())
+        _make_tool_call_response([{
+            "id": "tc-1",
+            "name": "report_outcome",
+            "args": {"status": "fail", "failure_reason": "from tool call"},
+        }]),
+        # Round 2: model also produces a JSON text response — this must win
+        _make_text_response(json.dumps({"status": "success", "notes": "text wins"})),
+    ])
+
+    coordinator = NoSpawnCoordinator()
+    backend = AmplifierBackend(
+        coordinator=coordinator,
+        profiles={},
+        provider=object(),
+        tools={"report_outcome": report_tool},
+        unified_client=mock_client,
+    )
+    node = _make_node(attrs={"llm_provider": "test", "llm_model": "test-model"})
+    result = await backend.run(node, "evaluate", _make_context())
+
+    # Text JSON wins — must not return the "fail" from the tool call
+    assert result.status == StageStatus.SUCCESS
+    assert result.notes == "text wins"
+    # last_outcome must be reset so subsequent nodes are not poisoned
+    assert report_tool.last_outcome is None

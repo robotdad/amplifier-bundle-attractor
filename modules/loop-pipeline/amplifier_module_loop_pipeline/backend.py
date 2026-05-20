@@ -482,19 +482,33 @@ class AmplifierBackend:
 
         # Map GenerateResult → Outcome
         #
-        # Priority: check report_outcome tool's last_outcome FIRST.
-        # When a model uses extended thinking it may call report_outcome as its
-        # final action with no subsequent text turn, leaving result.text empty.
-        # Without this check, the empty-text branch below fires unconditionally
-        # and returns a hardcoded SUCCESS — discarding the tool's structured
-        # verdict (including context_updates and failure_reason).
-        # See: https://github.com/microsoft-amplifier/amplifier-support/issues/238
+        # Priority order (important — see issue #238):
+        #   1. result.text contains JSON-like content → authoritative; reset stale tool state
+        #   2. result.text is plain prose or empty → fall back to report_outcome last_outcome
+        #   3. last_outcome also absent → plain prose → SUCCESS (spec 4.5) or empty → SUCCESS
+        #
+        # Checking last_outcome BEFORE result.text would invert precedence: a model that
+        # calls report_outcome and then produces a JSON text response would have its text
+        # discarded.  Instead, JSON text wins; the tool outcome is the fallback for the
+        # extended-thinking case where the model makes no text turn after the tool call.
         report_outcome_tool = self._tools.get("report_outcome")
+
+        if result.text:
+            stripped = result.text.strip()
+            _fence_match = re.match(r"^```(?:json)?\s*([\s\S]*?)\s*```$", stripped, re.DOTALL)
+            is_json_like = bool(_fence_match) or stripped.startswith("{")
+            if is_json_like:
+                # Structured output in text — authoritative; discard any stale tool state
+                if report_outcome_tool:
+                    report_outcome_tool.last_outcome = None
+                return _parse_outcome(result.text)
+
+        # Text is plain prose or empty — fall back to tool-reported outcome if present
         if report_outcome_tool and getattr(report_outcome_tool, "last_outcome", None):
             lo = report_outcome_tool.last_outcome
             report_outcome_tool.last_outcome = None  # reset — must happen before return
             return Outcome(
-                status=_STATUS_MAP.get(lo.get("status"), StageStatus.SUCCESS),
+                status=_STATUS_MAP.get(lo.get("status"), StageStatus.FAIL),
                 context_updates=lo.get("context_updates"),
                 failure_reason=lo.get("failure_reason"),
                 preferred_label=lo.get("preferred_label"),
@@ -503,7 +517,7 @@ class AmplifierBackend:
             )
 
         if result.text:
-            return _parse_outcome(result.text)
+            return _parse_outcome(result.text)  # plain prose → SUCCESS per spec 4.5
         return Outcome(
             status=StageStatus.SUCCESS,
             notes=f"Stage completed: {node.id}",

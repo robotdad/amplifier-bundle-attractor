@@ -962,7 +962,6 @@ async def test_tool_loop_report_outcome_terminal_action_empty_text():
     assert result.status == StageStatus.FAIL
     assert result.failure_reason == "quality gate failed"
     assert result.context_updates == {"quality_feedback": "fix X"}
-    assert result.is_explicit_verdict is True
     # last_outcome must be cleared so subsequent nodes are not poisoned
     assert report_tool.last_outcome is None
 

@@ -216,44 +216,10 @@ class AmplifierBackend:
                 graph,
                 context,
             )
-            # Fall back to the direct tool loop ONLY for undiagnosed spawn failures
-            # (empty output, unparseable text) — not for explicit node verdicts.
-            #
-            # History: this fallback was added (Feb 2026) to handle cases where
-            # session.spawn succeeds mechanically but produces no usable output
-            # (e.g. agent profile misconfigured, child exits immediately with no
-            # response).  It must NOT fire when a goal_gate node intentionally
-            # reports {"status":"fail"} — doing so re-runs the gate without the
-            # child's context and silently converts the failure to success.
-            #
-            # The is_explicit_verdict flag on Outcome distinguishes the two cases:
-            #   True  — JSON with a "status" field was parsed from the child's output
-            #           → node made an intentional decision → propagate as-is
-            #   False — empty output, unparseable text, or no "status" key found
-            #           → spawn may have failed silently → fallback is appropriate
-            #
-            # Note: infrastructure spawn failures (spawn raises an exception) are
-            # already handled inside _run_with_spawn via try/except → early return,
-            # so they never reach this block.
-            if (
-                outcome.status == StageStatus.FAIL
-                and self._provider is not None
-                and not outcome.is_explicit_verdict
-            ):
-                logger.warning(
-                    "Node %s: spawn returned undiagnosed FAIL (empty or "
-                    "unparseable output); falling back to direct tool loop. "
-                    "If this is a goal_gate node, ensure the child agent "
-                    'returns explicit JSON ({"status": "fail", ...}) rather '
-                    "than empty output.",
-                    node.id,
-                )
-                outcome = await self._run_with_tool_loop(
-                    node,
-                    instruction,
-                    reasoning_effort,
-                    max_agent_turns,
-                )
+            # Fallback logic (infrastructure failure, empty output) is handled
+            # inside _run_with_spawn — see that method for the full rationale.
+            # When _run_with_spawn returns here, the child ran and produced output;
+            # _parse_outcome has already determined the outcome.
         elif self._provider is not None:
             outcome = await self._run_with_tool_loop(
                 node,
@@ -351,14 +317,43 @@ class AmplifierBackend:
         try:
             result = await self._spawn_fn(**spawn_kwargs)
         except Exception as e:
+            # Infrastructure failure: the spawn mechanism itself broke (e.g.
+            # agent profile not found, session init error).  The child never
+            # ran, so falling back to the direct tool loop is reasonable.
             logger.warning("Spawn failed for node %s: %s", node.id, e)
+            if self._provider is not None:
+                logger.warning(
+                    "Node %s: retrying via direct tool loop after spawn exception",
+                    node.id,
+                )
+                return await self._run_with_tool_loop(
+                    node, instruction, reasoning_effort, max_agent_turns
+                )
+            return Outcome(status=StageStatus.FAIL, failure_reason=str(e))
+
+        # Parse outcome from result.
+        # If the child produced output, _parse_outcome determines the outcome —
+        # including intentional {"status":"fail"} verdicts from goal_gate nodes.
+        # If the child produced NO output (silent failure — crash, bad profile,
+        # etc.), fall back to the direct tool loop the same way an exception would.
+        output = result.get("output", "") if isinstance(result, dict) else str(result)
+        if not output.strip():
+            if self._provider is not None:
+                logger.warning(
+                    "Node %s: spawn returned empty output; "
+                    "falling back to direct tool loop. "
+                    "Ensure the child agent profile is correctly configured.",
+                    node.id,
+                )
+                return await self._run_with_tool_loop(
+                    node, instruction, reasoning_effort, max_agent_turns
+                )
             return Outcome(
                 status=StageStatus.FAIL,
-                failure_reason=str(e),
+                notes="No output from child session",
+                failure_reason="Empty spawn output",
             )
 
-        # Parse outcome from result
-        output = result.get("output", "") if isinstance(result, dict) else str(result)
         outcome = _parse_outcome(output)
 
         # Capture session_id from spawn result — always, for all fidelity modes
@@ -505,7 +500,6 @@ class AmplifierBackend:
                 preferred_label=lo.get("preferred_label"),
                 suggested_next_ids=lo.get("suggested_next_ids"),
                 notes=lo.get("notes"),
-                is_explicit_verdict=True,
             )
 
         if result.text:
@@ -647,9 +641,6 @@ def _parse_outcome(output: str) -> Outcome:
                         preferred_label=data.get("preferred_label"),
                         suggested_next_ids=data.get("suggested_next_ids"),
                         context_updates=data.get("context_updates"),
-                        # Mark as an explicit verdict so the spawn fallback in
-                        # AmplifierBackend.execute() does not re-run this node.
-                        is_explicit_verdict=True,
                     )
         except (json.JSONDecodeError, KeyError, TypeError):
             pass

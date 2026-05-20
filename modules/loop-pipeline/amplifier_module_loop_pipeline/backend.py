@@ -216,18 +216,11 @@ class AmplifierBackend:
                 graph,
                 context,
             )
-            # Fall back to direct tool loop if spawn failed and provider available
-            if outcome.status == StageStatus.FAIL and self._provider is not None:
-                logger.info(
-                    "Spawn failed for node %s, falling back to direct tool loop",
-                    node.id,
-                )
-                outcome = await self._run_with_tool_loop(
-                    node,
-                    instruction,
-                    reasoning_effort,
-                    max_agent_turns,
-                )
+            # NOTE: No tool-loop fallback here. Infrastructure spawn failures are
+            # already handled in _run_with_spawn (exception → early return FAIL).
+            # Falling back on _parse_outcome FAIL would silently convert intentional
+            # goal_gate failures (e.g. quality_eval returning {"status":"fail"}) to
+            # success, bypassing the gate without any log warning.
         elif self._provider is not None:
             outcome = await self._run_with_tool_loop(
                 node,

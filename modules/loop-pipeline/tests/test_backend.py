@@ -919,34 +919,67 @@ async def test_backend_no_injection_without_human_gate_text():
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
-async def test_tool_loop_report_outcome_terminal_action_empty_text():
-    """report_outcome called as terminal action, result.text empty → last_outcome used.
+class _MockReportOutcomeTool:
+    """Minimal stand-in for ReportOutcomeTool.
 
-    Reproduces the extended-thinking scenario: the model calls report_outcome as
-    its final action, producing no subsequent text turn.  Without the last_outcome
-    check, the empty-text branch returns hardcoded SUCCESS and the verdict is lost.
+    execute() stores the call arguments in last_outcome, mirroring the real
+    tool's behaviour.  This lets _make_tool_call_response drive the tool via
+    unified_llm.generate() instead of pre-setting last_outcome manually.
     """
 
-    class _MockReportOutcomeTool:
-        name = "report_outcome"
-        description = "Report outcome"
-        parameters = {"type": "object", "properties": {}}
-        last_outcome: dict | None = None
-
-        async def execute(self, input):
-            return _MockToolResult(output="recorded")
-
-    report_tool = _MockReportOutcomeTool()
-    # Pre-set last_outcome to simulate the tool having been called during generate()
-    report_tool.last_outcome = {
-        "status": "fail",
-        "failure_reason": "quality gate failed",
-        "context_updates": {"quality_feedback": "fix X"},
+    name = "report_outcome"
+    description = "Report structured outcome for pipeline routing."
+    parameters = {
+        "type": "object",
+        "properties": {
+            "status": {"type": "string"},
+            "failure_reason": {"type": "string"},
+            "context_updates": {"type": "object"},
+        },
+        "required": ["status"],
     }
+    last_outcome: dict | None = None
 
-    # result.text is empty — model made no text turn after the tool call
-    mock_client = _MockUnifiedClient([_make_text_response("")])
+    async def execute(self, input: dict) -> _MockToolResult:
+        # Mirror ReportOutcomeTool.execute(): validate and store.
+        status = input.get("status")
+        if not status:
+            return _MockToolResult(output="error: status required", success=False)
+        outcome: dict = {"status": status}
+        for key in ("failure_reason", "context_updates", "preferred_label", "notes"):
+            val = input.get(key)
+            if val is not None:
+                outcome[key] = val
+        self.last_outcome = outcome
+        return _MockToolResult(output=f"recorded: {status}")
+
+
+@pytest.mark.asyncio
+async def test_tool_loop_report_outcome_terminal_action_empty_text():
+    """generate() calls report_outcome as terminal tool; result.text empty → last_outcome used.
+
+    Uses _make_tool_call_response to drive the tool call through unified_llm.generate()
+    (the same pattern as test_tool_loop_executes_tools_then_returns).  The mock client
+    returns a tool_call_response for report_outcome followed by an empty text response,
+    reproducing the extended-thinking scenario where the model makes no text turn after
+    the tool call.  Without the last_outcome check the backend returns hardcoded SUCCESS.
+    """
+    report_tool = _MockReportOutcomeTool()
+
+    mock_client = _MockUnifiedClient([
+        # Round 1: model calls report_outcome as its terminal action
+        _make_tool_call_response([{
+            "id": "tc-1",
+            "name": "report_outcome",
+            "args": {
+                "status": "fail",
+                "failure_reason": "quality gate failed",
+                "context_updates": {"quality_feedback": "fix X"},
+            },
+        }]),
+        # Round 2: empty text — no follow-up turn (extended thinking)
+        _make_text_response(""),
+    ])
 
     coordinator = NoSpawnCoordinator()
     backend = AmplifierBackend(
@@ -968,26 +1001,26 @@ async def test_tool_loop_report_outcome_terminal_action_empty_text():
 
 @pytest.mark.asyncio
 async def test_tool_loop_report_outcome_reset_between_nodes():
-    """last_outcome is cleared after being read; next node without the call is not poisoned."""
+    """last_outcome is cleared after reading; next node without the tool call is not poisoned.
 
-    class _MockReportOutcomeTool:
-        name = "report_outcome"
-        description = "Report outcome"
-        parameters = {"type": "object", "properties": {}}
-        last_outcome: dict | None = None
-
-        async def execute(self, input):
-            return _MockToolResult(output="recorded")
-
+    Node 1: generate() calls report_outcome → execute() sets last_outcome → empty text
+            → backend reads last_outcome (FAIL) and resets it to None.
+    Node 2: generate() returns plain text (no tool call)
+            → backend must NOT inherit node 1's verdict.
+    """
     report_tool = _MockReportOutcomeTool()
-    # Two separate calls: one client for node 1, one for node 2
-    mock_client_1 = _MockUnifiedClient([_make_text_response("")])
-    mock_client_2 = _MockUnifiedClient([_make_text_response("plain text done")])
 
     coordinator = NoSpawnCoordinator()
 
-    # --- Node 1: report_outcome was called, last_outcome is set, result.text empty ---
-    report_tool.last_outcome = {"status": "fail", "failure_reason": "first node failed"}
+    # --- Node 1: report_outcome called as terminal tool, result.text empty ---
+    mock_client_1 = _MockUnifiedClient([
+        _make_tool_call_response([{
+            "id": "tc-1",
+            "name": "report_outcome",
+            "args": {"status": "fail", "failure_reason": "first node failed"},
+        }]),
+        _make_text_response(""),
+    ])
     backend1 = AmplifierBackend(
         coordinator=coordinator,
         profiles={},
@@ -1000,10 +1033,10 @@ async def test_tool_loop_report_outcome_reset_between_nodes():
 
     assert result1.status == StageStatus.FAIL
     assert result1.failure_reason == "first node failed"
-    assert report_tool.last_outcome is None  # reset happened
+    assert report_tool.last_outcome is None  # consumed and reset
 
-    # --- Node 2: report_outcome was NOT called, result.text has content ---
-    # last_outcome is None → must not inherit node 1's verdict
+    # --- Node 2: no tool call, plain text response ---
+    mock_client_2 = _MockUnifiedClient([_make_text_response("plain text done")])
     backend2 = AmplifierBackend(
         coordinator=coordinator,
         profiles={},
@@ -1016,7 +1049,7 @@ async def test_tool_loop_report_outcome_reset_between_nodes():
 
     # Plain text → SUCCESS (spec 4.5); must NOT inherit node1's FAIL
     assert result2.status == StageStatus.SUCCESS
-    assert report_tool.last_outcome is None  # still None, never set for node 2
+    assert report_tool.last_outcome is None
 
 
 @pytest.mark.asyncio

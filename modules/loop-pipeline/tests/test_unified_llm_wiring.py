@@ -485,9 +485,8 @@ async def test_direct_backend_compact_fidelity_uses_preamble():
 class _MockReportOutcomeTool:
     """Minimal stand-in for ReportOutcomeTool used in DirectProviderBackend tests.
 
-    execute() stores the call arguments in last_outcome, mirroring the real
-    tool's behaviour, so _make_tool_call_response drives the path through
-    unified_llm.generate() rather than pre-setting last_outcome manually.
+    The backend extracts outcome from result.steps[i].tool_calls (immutable,
+    race-free) so execute() only needs to return a truthy value.
     """
 
     name = "report_outcome"
@@ -501,29 +500,18 @@ class _MockReportOutcomeTool:
         },
         "required": ["status"],
     }
-    last_outcome: dict | None = None
 
     async def execute(self, input: dict) -> _MockToolResult:
-        status = input.get("status")
-        if not status:
-            return _MockToolResult(output="error: status required")
-        outcome: dict = {"status": status}
-        for key in ("failure_reason", "context_updates", "preferred_label", "notes"):
-            val = input.get(key)
-            if val is not None:
-                outcome[key] = val
-        self.last_outcome = outcome
-        return _MockToolResult(output=f"recorded: {status}")
+        return _MockToolResult(output=f"recorded: {input.get('status', '?')}")
 
 
 @pytest.mark.asyncio
 async def test_direct_backend_report_outcome_terminal_action_empty_text():
-    """DirectProviderBackend: report_outcome as terminal tool, result.text empty.
+    """DirectProviderBackend: report_outcome as terminal tool, result.text empty → step args used.
 
     Mirrors test_tool_loop_report_outcome_terminal_action_empty_text in test_backend.py
-    but targets DirectProviderBackend.run() — the default path used when no
-    session.spawn capability is available.  Without the last_outcome guard in
-    DirectProviderBackend.run(), the empty-text branch returns hardcoded SUCCESS.
+    but targets DirectProviderBackend.run(). Outcome is read from result.steps[i].tool_calls
+    (immutable), not from mutable tool state — race-free for cloned parallel backends.
     """
     report_tool = _MockReportOutcomeTool()
 
@@ -553,12 +541,11 @@ async def test_direct_backend_report_outcome_terminal_action_empty_text():
     assert result.status == StageStatus.FAIL
     assert result.failure_reason == "quality gate failed"
     assert result.context_updates == {"quality_feedback": "fix X"}
-    assert report_tool.last_outcome is None  # consumed and reset
 
 
 @pytest.mark.asyncio
-async def test_direct_backend_report_outcome_reset_between_nodes():
-    """DirectProviderBackend: last_outcome cleared after read; next node not poisoned."""
+async def test_direct_backend_report_outcome_no_cross_node_bleed():
+    """DirectProviderBackend: each generate() call has its own steps — no cross-node bleed."""
     report_tool = _MockReportOutcomeTool()
     backend = DirectProviderBackend(provider=object())
     backend._tools = {"report_outcome": report_tool}
@@ -577,7 +564,6 @@ async def test_direct_backend_report_outcome_reset_between_nodes():
 
     assert result1.status == StageStatus.FAIL
     assert result1.failure_reason == "first node failed"
-    assert report_tool.last_outcome is None  # consumed and reset
 
     # Node 2: no tool call, plain text response — must NOT inherit node 1's verdict
     backend._unified_client = _MockUnifiedClient([_make_text_response("plain text done")])
@@ -585,4 +571,3 @@ async def test_direct_backend_report_outcome_reset_between_nodes():
     result2 = await backend.run(node2, "task 2", _make_context())
 
     assert result2.status == StageStatus.SUCCESS
-    assert report_tool.last_outcome is None

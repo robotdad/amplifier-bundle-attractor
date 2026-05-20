@@ -15,6 +15,7 @@ __amplifier_module_type__ = "orchestrator"
 import json
 import logging
 import os
+import re
 import tempfile
 from typing import Any
 
@@ -78,6 +79,7 @@ class DirectProviderBackend:
 
         from .backend import (
             _build_unified_tools,
+            _find_report_outcome_call,
             _parse_outcome,
             _resolve_model,
             _STATUS_MAP,
@@ -217,27 +219,15 @@ class DirectProviderBackend:
             },
         )
 
-        # Map GenerateResult → Outcome
-        #
-        # Priority order (mirrors AmplifierBackend._run_with_tool_loop):
-        #   1. result.text contains JSON-like content → authoritative; reset stale tool state
-        #   2. result.text is plain prose or empty → fall back to report_outcome last_outcome
-        #   3. last_outcome also absent → plain prose → SUCCESS (spec 4.5) or empty → SUCCESS
-        import re as _re
-
-        report_outcome_tool = self._tools.get("report_outcome")
+        # Map GenerateResult → Outcome (same priority order as _run_with_tool_loop)
         text = result.text
 
         if text:
             stripped = text.strip()
-            _fence_match = _re.match(
-                r"^```(?:json)?\s*([\s\S]*?)\s*```$", stripped, _re.DOTALL
+            _fence_match = re.match(
+                r"^```(?:json)?\s*([\s\S]*?)\s*```$", stripped, re.DOTALL
             )
-            is_json_like = bool(_fence_match) or stripped.startswith("{")
-            if is_json_like:
-                # Structured output in text — authoritative; discard stale tool state
-                if report_outcome_tool:
-                    report_outcome_tool.last_outcome = None
+            if bool(_fence_match) or stripped.startswith("{"):
                 outcome = _parse_outcome(text)
                 outcome.context_updates = {
                     "last_stage": node.id,
@@ -247,10 +237,9 @@ class DirectProviderBackend:
                 self._last_node_id = node.id
                 return outcome
 
-        # Text is plain prose or empty — fall back to tool-reported outcome if present
-        if report_outcome_tool and getattr(report_outcome_tool, "last_outcome", None):
-            lo = report_outcome_tool.last_outcome
-            report_outcome_tool.last_outcome = None  # reset — must happen before return
+        # Text is plain prose or empty — check if report_outcome was called
+        lo = _find_report_outcome_call(result)
+        if lo is not None:
             outcome = Outcome(
                 status=_STATUS_MAP.get(lo.get("status"), StageStatus.FAIL),
                 context_updates=lo.get("context_updates"),

@@ -482,31 +482,21 @@ class AmplifierBackend:
 
         # Map GenerateResult → Outcome
         #
-        # Priority order (important — see issue #238):
-        #   1. result.text contains JSON-like content → authoritative; reset stale tool state
-        #   2. result.text is plain prose or empty → fall back to report_outcome last_outcome
-        #   3. last_outcome also absent → plain prose → SUCCESS (spec 4.5) or empty → SUCCESS
-        #
-        # Checking last_outcome BEFORE result.text would invert precedence: a model that
-        # calls report_outcome and then produces a JSON text response would have its text
-        # discarded.  Instead, JSON text wins; the tool outcome is the fallback for the
-        # extended-thinking case where the model makes no text turn after the tool call.
-        report_outcome_tool = self._tools.get("report_outcome")
-
+        # Priority order (see issue #238):
+        #   1. result.text contains JSON-like content → authoritative, use it
+        #   2. result.text is plain prose or empty → fall back to report_outcome tool call args
+        #      (extracted from result.steps — immutable, race-free; avoids the last_outcome
+        #       shared-state bug when backend instances are cloned for parallel branches)
+        #   3. No tool call either → plain prose → SUCCESS (spec 4.5), or empty → SUCCESS
         if result.text:
             stripped = result.text.strip()
             _fence_match = re.match(r"^```(?:json)?\s*([\s\S]*?)\s*```$", stripped, re.DOTALL)
-            is_json_like = bool(_fence_match) or stripped.startswith("{")
-            if is_json_like:
-                # Structured output in text — authoritative; discard any stale tool state
-                if report_outcome_tool:
-                    report_outcome_tool.last_outcome = None
+            if bool(_fence_match) or stripped.startswith("{"):
                 return _parse_outcome(result.text)
 
-        # Text is plain prose or empty — fall back to tool-reported outcome if present
-        if report_outcome_tool and getattr(report_outcome_tool, "last_outcome", None):
-            lo = report_outcome_tool.last_outcome
-            report_outcome_tool.last_outcome = None  # reset — must happen before return
+        # Text is plain prose or empty — check if report_outcome was called
+        lo = _find_report_outcome_call(result)
+        if lo is not None:
             return Outcome(
                 status=_STATUS_MAP.get(lo.get("status"), StageStatus.FAIL),
                 context_updates=lo.get("context_updates"),
@@ -613,6 +603,23 @@ def _build_unified_tools(pipeline_tools: dict[str, Any]) -> list[Any]:
             )
         )
     return tools
+
+
+def _find_report_outcome_call(result: Any) -> dict[str, Any] | None:
+    """Return report_outcome call arguments from generate() result steps, or None.
+
+    Walks result.steps[i].tool_calls (each StepResult carries the tool calls
+    for that LLM exchange).  Using the immutable step record avoids the
+    ReportOutcomeTool.last_outcome shared-state bug: backend.clone() shallow-
+    copies self._tools, so parallel branches share the same tool object and
+    would race on last_outcome.  result.steps is created fresh per generate()
+    call and is never shared between branches.
+    """
+    for step in getattr(result, "steps", []) or []:
+        for tc in getattr(step, "tool_calls", []) or []:
+            if getattr(tc, "name", None) == "report_outcome":
+                return getattr(tc, "arguments", {}) or {}
+    return None
 
 
 def _parse_outcome(output: str) -> Outcome:

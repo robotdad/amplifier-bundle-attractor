@@ -80,6 +80,7 @@ class DirectProviderBackend:
             _build_unified_tools,
             _parse_outcome,
             _resolve_model,
+            _STATUS_MAP,
             _MAX_TOOL_LOOP_ROUNDS,
         )
 
@@ -217,6 +218,28 @@ class DirectProviderBackend:
         )
 
         # Map GenerateResult → Outcome
+        # Check report_outcome tool's last_outcome first — same logic as
+        # AmplifierBackend._run_with_tool_loop().  When extended thinking is
+        # active the model may call report_outcome as a terminal action with no
+        # subsequent text turn, leaving result.text empty.  Without this check
+        # the empty-text branch fires and hardcodes SUCCESS, discarding the
+        # structured verdict and any context_updates.
+        report_outcome_tool = self._tools.get("report_outcome")
+        if report_outcome_tool and getattr(report_outcome_tool, "last_outcome", None):
+            lo = report_outcome_tool.last_outcome
+            report_outcome_tool.last_outcome = None  # reset — must happen before return
+            outcome = Outcome(
+                status=_STATUS_MAP.get(lo.get("status"), StageStatus.SUCCESS),
+                context_updates=lo.get("context_updates"),
+                failure_reason=lo.get("failure_reason"),
+                preferred_label=lo.get("preferred_label"),
+                suggested_next_ids=lo.get("suggested_next_ids"),
+                notes=lo.get("notes"),
+            )
+            self._completed_nodes[node.id] = outcome
+            self._last_node_id = node.id
+            return outcome
+
         text = result.text
         if text:
             outcome = _parse_outcome(text)

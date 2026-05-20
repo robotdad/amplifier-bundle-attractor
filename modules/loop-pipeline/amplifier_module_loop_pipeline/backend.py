@@ -486,6 +486,28 @@ class AmplifierBackend:
         )
 
         # Map GenerateResult → Outcome
+        #
+        # Priority: check report_outcome tool's last_outcome FIRST.
+        # When a model uses extended thinking it may call report_outcome as its
+        # final action with no subsequent text turn, leaving result.text empty.
+        # Without this check, the empty-text branch below fires unconditionally
+        # and returns a hardcoded SUCCESS — discarding the tool's structured
+        # verdict (including context_updates and failure_reason).
+        # See: https://github.com/microsoft-amplifier/amplifier-support/issues/238
+        report_outcome_tool = self._tools.get("report_outcome")
+        if report_outcome_tool and getattr(report_outcome_tool, "last_outcome", None):
+            lo = report_outcome_tool.last_outcome
+            report_outcome_tool.last_outcome = None  # reset — must happen before return
+            return Outcome(
+                status=_STATUS_MAP.get(lo.get("status"), StageStatus.SUCCESS),
+                context_updates=lo.get("context_updates"),
+                failure_reason=lo.get("failure_reason"),
+                preferred_label=lo.get("preferred_label"),
+                suggested_next_ids=lo.get("suggested_next_ids"),
+                notes=lo.get("notes"),
+                is_explicit_verdict=True,
+            )
+
         if result.text:
             return _parse_outcome(result.text)
         return Outcome(
@@ -562,7 +584,11 @@ def _build_unified_tools(pipeline_tools: dict[str, Any]) -> list[Any]:
 
     tools: list[Any] = []
     for tool in pipeline_tools.values():
-        schema = getattr(tool, "parameters", None) or getattr(tool, "schema", None)
+        schema = (
+            getattr(tool, "parameters", None)
+            or getattr(tool, "schema", None)
+            or getattr(tool, "input_schema", None)  # ReportOutcomeTool exposes this
+        )
         if schema is None:
             schema = {"type": "object", "properties": {}}
 

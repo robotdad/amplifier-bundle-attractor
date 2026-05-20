@@ -912,3 +912,142 @@ async def test_backend_no_injection_without_human_gate_text():
 
     # human.gate.text should still be None (never set, never cleared)
     assert context.get("human.gate.text") is None
+
+
+# ---------------------------------------------------------------------------
+# report_outcome tool integration with _run_with_tool_loop  (issue #238)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_tool_loop_report_outcome_terminal_action_empty_text():
+    """report_outcome called as terminal action, result.text empty → last_outcome used.
+
+    Reproduces the extended-thinking scenario: the model calls report_outcome as
+    its final action, producing no subsequent text turn.  Without the last_outcome
+    check, the empty-text branch returns hardcoded SUCCESS and the verdict is lost.
+    """
+
+    class _MockReportOutcomeTool:
+        name = "report_outcome"
+        description = "Report outcome"
+        parameters = {"type": "object", "properties": {}}
+        last_outcome: dict | None = None
+
+        async def execute(self, input):
+            return _MockToolResult(output="recorded")
+
+    report_tool = _MockReportOutcomeTool()
+    # Pre-set last_outcome to simulate the tool having been called during generate()
+    report_tool.last_outcome = {
+        "status": "fail",
+        "failure_reason": "quality gate failed",
+        "context_updates": {"quality_feedback": "fix X"},
+    }
+
+    # result.text is empty — model made no text turn after the tool call
+    mock_client = _MockUnifiedClient([_make_text_response("")])
+
+    coordinator = NoSpawnCoordinator()
+    backend = AmplifierBackend(
+        coordinator=coordinator,
+        profiles={},
+        provider=object(),
+        tools={"report_outcome": report_tool},
+        unified_client=mock_client,
+    )
+    node = _make_node(attrs={"llm_provider": "test", "llm_model": "test-model"})
+    result = await backend.run(node, "evaluate quality", _make_context())
+
+    assert result.status == StageStatus.FAIL
+    assert result.failure_reason == "quality gate failed"
+    assert result.context_updates == {"quality_feedback": "fix X"}
+    assert result.is_explicit_verdict is True
+    # last_outcome must be cleared so subsequent nodes are not poisoned
+    assert report_tool.last_outcome is None
+
+
+@pytest.mark.asyncio
+async def test_tool_loop_report_outcome_reset_between_nodes():
+    """last_outcome is cleared after being read; next node without the call is not poisoned."""
+
+    class _MockReportOutcomeTool:
+        name = "report_outcome"
+        description = "Report outcome"
+        parameters = {"type": "object", "properties": {}}
+        last_outcome: dict | None = None
+
+        async def execute(self, input):
+            return _MockToolResult(output="recorded")
+
+    report_tool = _MockReportOutcomeTool()
+    # Two separate calls: one client for node 1, one for node 2
+    mock_client_1 = _MockUnifiedClient([_make_text_response("")])
+    mock_client_2 = _MockUnifiedClient([_make_text_response("plain text done")])
+
+    coordinator = NoSpawnCoordinator()
+
+    # --- Node 1: report_outcome was called, last_outcome is set, result.text empty ---
+    report_tool.last_outcome = {"status": "fail", "failure_reason": "first node failed"}
+    backend1 = AmplifierBackend(
+        coordinator=coordinator,
+        profiles={},
+        provider=object(),
+        tools={"report_outcome": report_tool},
+        unified_client=mock_client_1,
+    )
+    node1 = _make_node(id="node1", attrs={"llm_provider": "test", "llm_model": "test-model"})
+    result1 = await backend1.run(node1, "task 1", _make_context())
+
+    assert result1.status == StageStatus.FAIL
+    assert result1.failure_reason == "first node failed"
+    assert report_tool.last_outcome is None  # reset happened
+
+    # --- Node 2: report_outcome was NOT called, result.text has content ---
+    # last_outcome is None → must not inherit node 1's verdict
+    backend2 = AmplifierBackend(
+        coordinator=coordinator,
+        profiles={},
+        provider=object(),
+        tools={"report_outcome": report_tool},
+        unified_client=mock_client_2,
+    )
+    node2 = _make_node(id="node2", attrs={"llm_provider": "test", "llm_model": "test-model"})
+    result2 = await backend2.run(node2, "task 2", _make_context())
+
+    # Plain text → SUCCESS (spec 4.5); must NOT inherit node1's FAIL
+    assert result2.status == StageStatus.SUCCESS
+    assert report_tool.last_outcome is None  # still None, never set for node 2
+
+
+@pytest.mark.asyncio
+async def test_build_unified_tools_falls_back_to_input_schema():
+    """_build_unified_tools resolves input_schema when parameters and schema are absent.
+
+    ReportOutcomeTool exposes its schema via the input_schema property.
+    Without this fallback it was registered with an empty schema, meaning
+    the provider had no declared parameters to enforce.
+    """
+    from amplifier_module_loop_pipeline.backend import _build_unified_tools
+
+    class _ToolWithInputSchema:
+        name = "report_outcome"
+        description = "Report outcome"
+        # Deliberately omit "parameters" and "schema" — only input_schema
+        @property
+        def input_schema(self) -> dict:
+            return {
+                "type": "object",
+                "properties": {"status": {"type": "string"}},
+                "required": ["status"],
+            }
+
+        async def execute(self, input):
+            return _MockToolResult(output="ok")
+
+    tools = _build_unified_tools({"report_outcome": _ToolWithInputSchema()})
+    assert len(tools) == 1
+    assert tools[0].name == "report_outcome"
+    assert "properties" in tools[0].parameters
+    assert "status" in tools[0].parameters["properties"]
+    assert tools[0].parameters.get("required") == ["status"]

@@ -45,6 +45,12 @@ class Outcome:
     session_id: str | None = (
         None  # child Amplifier session ID (if executed via AmplifierBackend)
     )
+    #: True when status was explicitly stated in JSON output by the node
+    #: (e.g. {"status": "fail", ...}).  False for inferred outcomes such as
+    #: empty output or unparseable text.  Used by AmplifierBackend to
+    #: distinguish intentional goal_gate verdicts from undiagnosed spawn
+    #: failures, so only the latter trigger the tool-loop fallback.
+    is_explicit_verdict: bool = False
     #: Issue 10 / analog of WS-4 Sub-fix C: structured tool-invocation payload
     #: populated by ToolHandler on failure so the dashboard can display the
     #: command and output instead of the "command lost on failure" placeholder.

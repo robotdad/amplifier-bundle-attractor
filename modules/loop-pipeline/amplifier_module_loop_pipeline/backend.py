@@ -216,11 +216,44 @@ class AmplifierBackend:
                 graph,
                 context,
             )
-            # NOTE: No tool-loop fallback here. Infrastructure spawn failures are
-            # already handled in _run_with_spawn (exception → early return FAIL).
-            # Falling back on _parse_outcome FAIL would silently convert intentional
-            # goal_gate failures (e.g. quality_eval returning {"status":"fail"}) to
-            # success, bypassing the gate without any log warning.
+            # Fall back to the direct tool loop ONLY for undiagnosed spawn failures
+            # (empty output, unparseable text) — not for explicit node verdicts.
+            #
+            # History: this fallback was added (Feb 2026) to handle cases where
+            # session.spawn succeeds mechanically but produces no usable output
+            # (e.g. agent profile misconfigured, child exits immediately with no
+            # response).  It must NOT fire when a goal_gate node intentionally
+            # reports {"status":"fail"} — doing so re-runs the gate without the
+            # child's context and silently converts the failure to success.
+            #
+            # The is_explicit_verdict flag on Outcome distinguishes the two cases:
+            #   True  — JSON with a "status" field was parsed from the child's output
+            #           → node made an intentional decision → propagate as-is
+            #   False — empty output, unparseable text, or no "status" key found
+            #           → spawn may have failed silently → fallback is appropriate
+            #
+            # Note: infrastructure spawn failures (spawn raises an exception) are
+            # already handled inside _run_with_spawn via try/except → early return,
+            # so they never reach this block.
+            if (
+                outcome.status == StageStatus.FAIL
+                and self._provider is not None
+                and not outcome.is_explicit_verdict
+            ):
+                logger.warning(
+                    "Node %s: spawn returned undiagnosed FAIL (empty or "
+                    "unparseable output); falling back to direct tool loop. "
+                    "If this is a goal_gate node, ensure the child agent "
+                    'returns explicit JSON ({"status": "fail", ...}) rather '
+                    "than empty output.",
+                    node.id,
+                )
+                outcome = await self._run_with_tool_loop(
+                    node,
+                    instruction,
+                    reasoning_effort,
+                    max_agent_turns,
+                )
         elif self._provider is not None:
             outcome = await self._run_with_tool_loop(
                 node,
@@ -588,6 +621,9 @@ def _parse_outcome(output: str) -> Outcome:
                         preferred_label=data.get("preferred_label"),
                         suggested_next_ids=data.get("suggested_next_ids"),
                         context_updates=data.get("context_updates"),
+                        # Mark as an explicit verdict so the spawn fallback in
+                        # AmplifierBackend.execute() does not re-run this node.
+                        is_explicit_verdict=True,
                     )
         except (json.JSONDecodeError, KeyError, TypeError):
             pass

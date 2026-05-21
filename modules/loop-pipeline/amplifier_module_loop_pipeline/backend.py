@@ -120,7 +120,16 @@ class AmplifierBackend:
         # (those exposing last_outcome) get an independent shallow copy with last_outcome
         # reset to None, so parallel branches start clean regardless of prior use.
         def _clone_tool(tool: Any) -> Any:
-            if hasattr(tool, "last_outcome"):
+            # Detect stateful tools via explicit __dict__ inspection — not hasattr(),
+            # which returns True for MagicMock and other proxy objects that fabricate
+            # attributes dynamically.
+            is_stateful = (
+                # Instance attribute (e.g. ReportOutcomeTool sets self.last_outcome in __init__)
+                "last_outcome" in getattr(tool, "__dict__", {})
+                # Class attribute (e.g. _MockReportOutcomeTool defines last_outcome at class level)
+                or any("last_outcome" in vars(cls) for cls in type(tool).__mro__)
+            )
+            if is_stateful:
                 c = copy.copy(tool)
                 c.last_outcome = None
                 return c

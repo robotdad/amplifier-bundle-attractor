@@ -1107,14 +1107,17 @@ async def test_tool_loop_report_outcome_json_text_wins_over_last_outcome():
 
 
 def test_clone_isolates_stateful_tool_instances():
-    """clone() gives each branch its own shallow copy of stateful tools.
+    """clone() gives each branch its own shallow copy with last_outcome reset.
 
-    Tools with last_outcome are stateful — sharing them across clones lets
-    parallel branches corrupt each other's outcome state.  clone() must
-    produce independent copies so branch A's execute() cannot overwrite
-    branch B's last_outcome before B reads it back.
+    Covers two sub-cases:
+    1. Object identity — clone holds a different tool instance than the original.
+    2. Stale-state isolation — even if last_outcome was set by a prior run before
+       clone() is called, the cloned branch starts with last_outcome=None and
+       mutations on the clone do not propagate back to the original.
     """
     report_tool = _MockReportOutcomeTool()
+    # Simulate the tool having been used before clone() is called
+    report_tool.last_outcome = {"status": "fail", "failure_reason": "prior run"}
 
     backend = AmplifierBackend(
         coordinator=NoSpawnCoordinator(),
@@ -1125,9 +1128,15 @@ def test_clone_isolates_stateful_tool_instances():
     )
     cloned = backend.clone()
 
-    # The cloned backend holds a different tool instance
+    # 1. Different instances — not the same object
     assert cloned._tools["report_outcome"] is not backend._tools["report_outcome"]
 
-    # Mutating the clone's tool state does not affect the original
-    cloned._tools["report_outcome"].last_outcome = {"status": "fail"}
-    assert backend._tools["report_outcome"].last_outcome is None
+    # 2. Clone starts with clean state regardless of prior use
+    assert cloned._tools["report_outcome"].last_outcome is None
+
+    # 3. Mutations on the clone do not affect the original
+    cloned._tools["report_outcome"].last_outcome = {"status": "success"}
+    assert backend._tools["report_outcome"].last_outcome == {
+        "status": "fail",
+        "failure_reason": "prior run",
+    }

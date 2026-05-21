@@ -117,12 +117,16 @@ class AmplifierBackend:
         new._unified_client = self._unified_client
         new._hooks = self._hooks
         # Copy tools: stateless tools are shared across clones (safe); stateful tools
-        # (those exposing last_outcome) get an independent shallow copy so parallel
-        # branches cannot corrupt each other's outcome state.
-        new._tools = {
-            k: (copy.copy(v) if hasattr(v, "last_outcome") else v)
-            for k, v in self._tools.items()
-        }
+        # (those exposing last_outcome) get an independent shallow copy with last_outcome
+        # reset to None, so parallel branches start clean regardless of prior use.
+        def _clone_tool(tool: Any) -> Any:
+            if hasattr(tool, "last_outcome"):
+                c = copy.copy(tool)
+                c.last_outcome = None
+                return c
+            return tool
+
+        new._tools = {k: _clone_tool(v) for k, v in self._tools.items()}
         # Fresh mutable state
         new._spawn_fn = None
         new._spawn_checked = False

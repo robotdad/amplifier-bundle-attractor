@@ -928,6 +928,7 @@ class _MockReportOutcomeTool:
     complete the tool loop — the call arguments are read from the step record.
     """
 
+    last_outcome: dict | None = None
     name = "report_outcome"
     description = "Report structured outcome for pipeline routing."
     parameters = {
@@ -1103,3 +1104,30 @@ async def test_tool_loop_report_outcome_json_text_wins_over_last_outcome():
     # Text JSON wins — must not return the "fail" from the tool call args
     assert result.status == StageStatus.SUCCESS
     assert result.notes == "text wins"
+
+
+def test_clone_isolates_stateful_tool_instances():
+    """clone() gives each branch its own shallow copy of stateful tools.
+
+    Tools with last_outcome are stateful — sharing them across clones lets
+    parallel branches corrupt each other's outcome state.  clone() must
+    produce independent copies so branch A's execute() cannot overwrite
+    branch B's last_outcome before B reads it back.
+    """
+    report_tool = _MockReportOutcomeTool()
+
+    backend = AmplifierBackend(
+        coordinator=NoSpawnCoordinator(),
+        profiles={},
+        provider=object(),
+        tools={"report_outcome": report_tool},
+        unified_client=_MockUnifiedClient([]),
+    )
+    cloned = backend.clone()
+
+    # The cloned backend holds a different tool instance
+    assert cloned._tools["report_outcome"] is not backend._tools["report_outcome"]
+
+    # Mutating the clone's tool state does not affect the original
+    cloned._tools["report_outcome"].last_outcome = {"status": "fail"}
+    assert backend._tools["report_outcome"].last_outcome is None

@@ -15,6 +15,7 @@ Spec coverage: Section 4.5 (CodergenBackend Interface), Section 1.4,
 
 from __future__ import annotations
 
+import copy
 import json
 import logging
 import re
@@ -115,8 +116,13 @@ class AmplifierBackend:
         new._provider = self._provider
         new._unified_client = self._unified_client
         new._hooks = self._hooks
-        # Shallow-copy tools (tool objects shared, dict independent)
-        new._tools = dict(self._tools)
+        # Copy tools: stateless tools are shared across clones (safe); stateful tools
+        # (those exposing last_outcome) get an independent shallow copy so parallel
+        # branches cannot corrupt each other's outcome state.
+        new._tools = {
+            k: (copy.copy(v) if hasattr(v, "last_outcome") else v)
+            for k, v in self._tools.items()
+        }
         # Fresh mutable state
         new._spawn_fn = None
         new._spawn_checked = False

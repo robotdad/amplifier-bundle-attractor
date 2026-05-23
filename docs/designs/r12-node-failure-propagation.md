@@ -204,8 +204,8 @@ These are implementation choices, not contract changes. The seven acceptance ass
 
 ## Awareness Compliance Check
 
-- ✅ No mention of DTU, LaunchDTU, TeardownDTU, resolve_validated, dotpowers, exercise, reality_check, orchestrator, semport, smoke_test, or any other specific pipeline.
-- ✅ No imports from `amplifier-resolve`, `amplifier-resolver-*`, `amplifier-bundle-resolve`, or any non-foundation bundle.
+- ✅ No mention of specific downstream pipelines or DTU concepts; the engine is consumer-agnostic per the REPOSITORY_RULES.md layering principle.
+- ✅ No imports from downstream consumers. The engine depends only on amplifier-core, internal modules, and (spec-only, no code import) strongdm/attractor.
 - ✅ The vocabulary used — *outputs*, *references*, *skip*, *runs_on* — is generic to any pipeline graph. Examples are placeholder names (`work`, `cleanup`, `launch`, `verify`).
 - ✅ Mechanisms are taught to *all* pipeline authors equally; no pipeline gets privileged status.
 - ✅ The engine remains pure mechanism; pipelines remain pure policy.

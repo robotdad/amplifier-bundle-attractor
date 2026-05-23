@@ -11,5 +11,4 @@ bundle:
     - git+https://github.com/microsoft/amplifier-bundle-webllm@main#subdirectory=behaviors/webllm.yaml
     - git+https://github.com/microsoft/amplifier-bundle-containers@main#subdirectory=behaviors/containers.yaml
     - git+https://github.com/microsoft/amplifier-bundle-rust-dev@main#subdirectory=behaviors/rust-dev.yaml
-    - git+https://github.com/microsoft/amplifier-bundle-browser-tester@main#subdirectory=behaviors/browser.yaml
     - git+https://github.com/microsoft/amplifier-bundle-execution-environments@main#subdirectory=behaviors/env-all.yaml

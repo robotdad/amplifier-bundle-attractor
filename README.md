@@ -3,6 +3,25 @@
 Multi-stage AI pipelines for code. Plan, implement, test, review — orchestrated as
 directed graphs.
 
+## Upstream Attribution and Layering
+
+This bundle implements the **attractor nlspec** defined at
+[github.com/strongdm/attractor](https://github.com/strongdm/attractor). Community
+`.dot` files written against the canonical spec should work without modification.
+
+We extend the spec selectively where high-value additions warrant it. Every extension is
+backward-compatible and documented in [`specs/EXTENSIONS.md`](specs/EXTENSIONS.md).
+If you find behavior that diverges from the canonical spec without an entry in that file,
+treat it as a bug.
+
+**Dependency awareness.** Per the Amplifier ecosystem
+[REPOSITORY_RULES.md](https://github.com/microsoft/amplifier-foundation/blob/main/docs/REPOSITORY_RULES.md):
+this bundle's declared code dependencies are `amplifier-core` and its own internal modules.
+It does not reference downstream consumers (resolvers, orchestration platforms, or
+application bundles). The one documented lineage exception is `amplifier-bundle-recipes`:
+attractor is a follow-up to that recipe-bundle work, and specific recipe patterns may be
+cited as prior-art inspiration where useful.
+
 ## Documentation
 
 | Guide | Description |

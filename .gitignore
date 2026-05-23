@@ -8,3 +8,4 @@ build/
 uv.lock
 .ruff_cache/
 .pytest_cache/
+/.amplifier/settings.local.yaml

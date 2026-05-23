@@ -19,7 +19,7 @@ Run these before opening a PR. The reviewer expects evidence in the PR body, not
 
 - **Unit tests**: `pytest modules/loop-pipeline/` (full suite).
 - **Targeted unit tests**: `pytest modules/loop-pipeline/tests/test_<specific>.py -v` while iterating.
-- **Live pipeline run** (required when touching `engine.py` or any handler): construct or pick a graph that exercises the changed code path and run it through the dot-graph resolver. A representative pipeline from `examples/pipelines/` is acceptable when it covers the path; otherwise build a minimal graph that does. Capture the resulting `events.jsonl` and include the relevant slice in the PR.
+- **Live pipeline run** (required when touching `engine.py` or any handler): construct or pick a graph that exercises the changed code path and run it through any attractor-compatible resolver. A representative pipeline from `examples/pipelines/` is acceptable when it covers the path; otherwise build a minimal graph that does. Capture the resulting `events.jsonl` and include the relevant slice in the PR.
 
 ## Verification gradient
 
@@ -41,6 +41,21 @@ Unit tests alone are insufficient for engine and handler changes. Past bugs have
 ## Spec authority
 
 When behavior is ambiguous, the canonical spec at `github.com/strongdm/attractor` is authoritative. Our implementation extends but does not contradict the spec. If you find yourself "fixing" something that is spec-conformant, stop and check `specs/` first.
+
+## Dependency awareness rule
+
+Attractor depends on `amplifier-core`, its own internal modules, and the strongdm/attractor nlspec (spec-only, no code import). Per
+[REPOSITORY_RULES.md](https://github.com/microsoft/amplifier-foundation/blob/main/docs/REPOSITORY_RULES.md):
+do not introduce references to other repositories in code, comments, docs, or test names. This
+includes resolvers, orchestration platforms, application bundles, or any downstream consumer.
+
+Exception: `amplifier-bundle-recipes` may be cited as historical inspiration — attractor is a
+follow-up to that recipe-bundle work, and specific recipe patterns are a legitimate prior-art
+reference.
+
+If you need to describe *where* to run a pipeline, say "any attractor-compatible resolver" or
+"any Amplifier session with the loop-pipeline module loaded" — not the name of a specific
+downstream resolver.
 
 ## PR checklist
 

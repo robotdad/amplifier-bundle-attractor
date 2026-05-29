@@ -10,6 +10,10 @@ Fallback chain: node.retry_target → node.fallback_retry_target →
 Spec coverage: EXEC-015–018, Section 3.3.
 """
 
+from __future__ import annotations
+
+from typing import Any
+
 import pytest
 
 from amplifier_module_loop_pipeline.context import PipelineContext
@@ -17,6 +21,7 @@ from amplifier_module_loop_pipeline.engine import PipelineEngine
 from amplifier_module_loop_pipeline.graph import Edge, Graph, Node
 from amplifier_module_loop_pipeline.handlers import HandlerRegistry
 from amplifier_module_loop_pipeline.outcome import Outcome, StageStatus
+from amplifier_module_loop_pipeline.pipeline_events import PIPELINE_ERROR
 
 
 class CountingBackend:
@@ -219,3 +224,122 @@ class TestFailureRoutingBounded:
         # Total calls should be bounded by _MAX_GOAL_GATE_RETRIES (shared limit)
         total_calls = backend.call_count("a") + backend.call_count("b")
         assert total_calls <= PipelineEngine._MAX_GOAL_GATE_RETRIES + 5
+
+
+# ---------------------------------------------------------------------------
+# Issue #251: Handler failure_reason preservation on routing termination
+# ---------------------------------------------------------------------------
+
+
+class _FailOutcomeBackend:
+    """Backend that returns a specific FAIL Outcome for one node, SUCCESS for others."""
+
+    def __init__(self, fail_node: str, failure_reason: str | None = None) -> None:
+        self._fail_node = fail_node
+        self._failure_reason = failure_reason
+
+    async def run(self, node: Node, prompt: str, context: Any) -> Outcome:
+        if node.id == self._fail_node:
+            return Outcome(status=StageStatus.FAIL, failure_reason=self._failure_reason)
+        return Outcome(status=StageStatus.SUCCESS)
+
+
+class _CapturingHooks:
+    """Minimal hooks implementation that records all emitted events."""
+
+    def __init__(self) -> None:
+        self.events: list[tuple[str, dict[str, Any]]] = []
+
+    async def emit(self, name: str, data: dict[str, Any]) -> None:
+        self.events.append((name, data))
+
+    def get(self, name: str) -> list[dict[str, Any]]:
+        return [d for n, d in self.events if n == name]
+
+
+def _graph_with_dead_end_worker() -> Graph:
+    """Graph: start → worker (no outgoing edges from worker).
+
+    A handler that returns FAIL with no matching FAIL-condition edge will
+    trigger routing termination at worker.
+    """
+    return Graph(
+        name="test",
+        nodes={
+            "start": Node(id="start", shape="Mdiamond"),
+            "worker": Node(id="worker", prompt="work"),
+            "exit": Node(id="exit", shape="Msquare"),
+        },
+        edges=[
+            Edge(from_node="start", to_node="worker"),
+            # No edge from worker — routing terminates there
+        ],
+    )
+
+
+class TestHandlerFailureReasonPreservation:
+    """Handler failure_reason must survive routing termination (issue #251).
+
+    When a handler returns Outcome(FAIL, failure_reason="X") and no outgoing
+    edge matches, the pipeline-level failure_reason must carry X, not the
+    routing message.  The routing context ("No matching edge …") moves to
+    the notes field when the handler provided its own reason.
+    """
+
+    @pytest.mark.asyncio
+    async def test_handler_failure_reason_preserved_when_no_matching_edge(
+        self, tmp_path
+    ):
+        """Handler failure_reason is preserved; routing message goes to notes."""
+        graph = _graph_with_dead_end_worker()
+        backend = _FailOutcomeBackend("worker", "specific handler failure reason")
+        engine = _make_engine(graph, backend=backend, logs_root=str(tmp_path))
+        outcome = await engine.run()
+
+        assert outcome.status == StageStatus.FAIL
+        # Handler's own reason must be the failure_reason
+        assert outcome.failure_reason == "specific handler failure reason"
+        # Routing context must be demoted to notes
+        assert outcome.notes is not None
+        assert "No matching edge" in outcome.notes
+        # Routing message must NOT bleed into failure_reason
+        assert "No matching edge" not in (outcome.failure_reason or "")
+
+    @pytest.mark.asyncio
+    async def test_routing_message_used_when_handler_has_no_failure_reason(
+        self, tmp_path
+    ):
+        """Today's behaviour preserved: routing message used when handler silent.
+
+        When a handler returns Outcome(FAIL) with no failure_reason, the routing
+        message becomes the failure_reason and notes stays None.
+        """
+        graph = _graph_with_dead_end_worker()
+        backend = _FailOutcomeBackend("worker", failure_reason=None)
+        engine = _make_engine(graph, backend=backend, logs_root=str(tmp_path))
+        outcome = await engine.run()
+
+        assert outcome.status == StageStatus.FAIL
+        assert "No matching edge" in (outcome.failure_reason or "")
+        assert outcome.notes is None
+
+    @pytest.mark.asyncio
+    async def test_pipeline_error_event_carries_handler_failure_reason(self, tmp_path):
+        """PIPELINE_ERROR event payload includes the handler's failure_reason.
+
+        The event carries both routing context (message) and handler reason
+        (handler_failure_reason) so consumers can distinguish the two.
+        """
+        graph = _graph_with_dead_end_worker()
+        backend = _FailOutcomeBackend("worker", "handler says: something broke")
+        hooks = _CapturingHooks()
+        engine = _make_engine(
+            graph, backend=backend, logs_root=str(tmp_path), hooks=hooks
+        )
+        await engine.run()
+
+        error_events = hooks.get(PIPELINE_ERROR)
+        assert len(error_events) == 1
+        ev = error_events[0]
+        assert ev.get("handler_failure_reason") == "handler says: something broke"
+        assert "No matching edge" in ev.get("message", "")

@@ -258,16 +258,25 @@ class PipelineEngine:
                     self.graph,
                 )
                 if edge is None:
+                    node_outcome = self.node_outcomes.get(current_node.id)
+                    original_reason = (
+                        node_outcome.failure_reason if node_outcome else None
+                    )
                     fail_outcome = Outcome(
                         status=StageStatus.FAIL,
-                        failure_reason=f"No matching edge from resumed node '{current_node.id}'",
+                        failure_reason=original_reason
+                        or f"No matching edge from resumed node '{current_node.id}'",
+                        notes=f"No matching edge from resumed node '{current_node.id}'"
+                        if original_reason
+                        else None,
                     )
                     await self._emit(
                         PIPELINE_ERROR,
                         {
                             "node_id": current_node.id,
                             "error_type": "no_matching_edge",
-                            "message": fail_outcome.failure_reason or "",
+                            "message": f"No matching edge from resumed node '{current_node.id}'",
+                            "handler_failure_reason": original_reason,
                         },
                     )
                     await self._emit_complete(fail_outcome, pipeline_start_time)
@@ -349,11 +358,14 @@ class PipelineEngine:
                         failure_routing_retries += 1
                         current_node = retry_node
                         continue
+                    original_reason = skip_outcome.failure_reason
                     fail_outcome = Outcome(
                         status=StageStatus.FAIL,
-                        failure_reason=(
-                            f"No matching edge from skipped node '{current_node.id}'"
-                        ),
+                        failure_reason=original_reason
+                        or f"No matching edge from skipped node '{current_node.id}'",
+                        notes=f"No matching edge from skipped node '{current_node.id}'"
+                        if original_reason
+                        else None,
                     )
                     await self._emit_complete(fail_outcome, pipeline_start_time)
                     return fail_outcome
@@ -689,14 +701,19 @@ class PipelineEngine:
 
                 fail_outcome = Outcome(
                     status=StageStatus.FAIL,
-                    failure_reason=f"No matching edge from node '{current_node.id}'",
+                    failure_reason=outcome.failure_reason
+                    or f"No matching edge from node '{current_node.id}'",
+                    notes=f"No matching edge from node '{current_node.id}'"
+                    if outcome.failure_reason
+                    else None,
                 )
                 await self._emit(
                     PIPELINE_ERROR,
                     {
                         "node_id": current_node.id,
                         "error_type": "no_matching_edge",
-                        "message": fail_outcome.failure_reason or "",
+                        "message": f"No matching edge from node '{current_node.id}'",
+                        "handler_failure_reason": outcome.failure_reason,
                     },
                 )
                 await self._emit_complete(fail_outcome, pipeline_start_time)

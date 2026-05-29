@@ -60,6 +60,20 @@ PIPELINE_GOAL_GATE_CHECK: str = "pipeline:goal_gate_check"
 # ---------------------------------------------------------------------------
 # Errors
 # ---------------------------------------------------------------------------
+
+#: Emitted when pipeline execution terminates with an error (e.g. no matching
+#: edge after all retry targets are exhausted).
+#:
+#: Payload fields (always present):
+#:   node_id                  — ID of the node that triggered the error
+#:   error_type               — error classification string (e.g.
+#:                              "no_matching_edge")
+#:   message                  — routing-level description of the failure
+#:                              (e.g. "No matching edge from node 'X'")
+#:   handler_failure_reason   — the failure_reason returned by the node handler,
+#:                              or None when the handler did not provide one.
+#:                              Distinguishes the handler's root cause from the
+#:                              routing-level message. Added in issue #251.
 PIPELINE_ERROR: str = "pipeline:error"
 
 # ---------------------------------------------------------------------------

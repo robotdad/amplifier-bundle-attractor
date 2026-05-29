@@ -509,6 +509,11 @@ def _parse_attr_block(tokens: list[str], pos: int) -> dict[str, Any]:
             if prev_was_value:
                 found_missing_comma = True
             key = tokens[i]
+            # Strip surrounding quotes from the key token (DOT grammar: quoted and
+            # unquoted IDs are equivalent). Mirrors what _parse_value does for values;
+            # without this, "key"="value" stores the key with embedded quotes.
+            if key.startswith('"') and key.endswith('"') and len(key) >= 2:
+                key = key[1:-1]
             raw_val = tokens[i + 2]
             attrs[key] = _parse_value(raw_val)
             prev_was_value = True

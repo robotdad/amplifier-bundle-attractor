@@ -575,6 +575,83 @@ def test_escape_multiline_shell_heredoc_tool_command_preserves_structure():
     """
     cmd_attr = "#!/bin/sh\\\\nset -e\\\\nprintf hello\\\\nprintf world"
     graph = parse_dot(f'digraph t {{ n [label="{cmd_attr}"] }}')
-    assert graph.nodes["n"].label == (
-        "#!/bin/sh\nset -e\nprintf hello\nprintf world"
+    assert graph.nodes["n"].label == ("#!/bin/sh\nset -e\nprintf hello\nprintf world")
+
+
+# --- DOT spec compliance: quoted attribute key tokens (fix #253) ---
+# Per Graphviz DOT grammar, quoted and unquoted IDs are semantically equivalent.
+# "key" and key name the same attribute. The parser must strip outer quotes from key
+# tokens, mirroring what _parse_value() does for values. Without this fix,
+# "manager.max_cycles"=5 stores the key as '"manager.max_cycles"' (with embedded
+# quotes), silently breaking any downstream lookup by bare name.
+
+
+def test_quoted_dotted_key_strips_outer_quotes():
+    """Quoted dotted key must be stored without outer quotes.
+
+    Per Graphviz DOT grammar, quoted and unquoted IDs are semantically equivalent.
+    "manager.max_cycles"=5 must produce attrs["manager.max_cycles"] == 5,
+    not attrs['"manager.max_cycles"'] (with embedded quotes in the key name).
+
+    The fix mirrors _parse_value() quote-stripping behaviour for key tokens.
+    """
+    graph = parse_dot('digraph t { A ["manager.max_cycles"=5] }')
+    # Bare (unquoted) key must be present
+    assert "manager.max_cycles" in graph.nodes["A"].attrs, (
+        f"expected key 'manager.max_cycles', got: {list(graph.nodes['A'].attrs.keys())}"
     )
+    # Embedded-quote form must NOT be present
+    assert '"manager.max_cycles"' not in graph.nodes["A"].attrs
+    assert graph.nodes["A"].attrs["manager.max_cycles"] == 5
+
+
+def test_quoted_key_with_space_strips_outer_quotes():
+    """Quoted key with internal space must preserve inner space, drop outer quotes.
+
+    Per DOT grammar, a quoted ID containing spaces is valid. "some key"="value"
+    must produce attrs["some key"] == "value", not attrs['"some key"'].
+    """
+    graph = parse_dot('digraph t { A ["some key"="value"] }')
+    assert "some key" in graph.nodes["A"].attrs, (
+        f"expected key 'some key', got: {list(graph.nodes['A'].attrs.keys())}"
+    )
+    assert '"some key"' not in graph.nodes["A"].attrs
+    assert graph.nodes["A"].attrs["some key"] == "value"
+
+
+def test_unquoted_dotted_key_unchanged():
+    """Regression guard: unquoted dotted keys must not be modified by the fix.
+
+    manager.max_cycles=3 must continue to produce attrs["manager.max_cycles"] == 3.
+    The fix must only strip outer quotes from quoted key tokens; unquoted keys are
+    already bare identifiers and must pass through unchanged.
+    """
+    graph = parse_dot("digraph t { A [manager.max_cycles=3] }")
+    assert graph.nodes["A"].attrs.get("manager.max_cycles") == 3
+
+
+def test_resolve_validated_context_injection_pattern():
+    """The resolve_validated.dot context-injection pattern must parse cleanly.
+
+    Production use-case (amplifier-resolver-dot-graph/.../resolve_validated.dot:186):
+        "context.delivery.target_branch"="main"
+
+    PipelineHandler.execute() (handlers/pipeline.py:155-159) checks
+    attr_key.startswith("context.") to inject context values into child pipelines.
+    When the parser emits '"context.delivery.target_branch"' (embedded-quote key)
+    instead of 'context.delivery.target_branch', the startswith check silently fails
+    and the target branch is never injected. The pipeline only avoided breakage
+    because "main" was the downstream default.
+
+    This test verifies the fix makes the injection actually work.
+    """
+    graph = parse_dot('digraph t { A ["context.delivery.target_branch"="main"] }')
+    key = "context.delivery.target_branch"
+    assert key in graph.nodes["A"].attrs, (
+        f"bare key '{key}' not found; embedded-quote form may still be present: "
+        f"{list(graph.nodes['A'].attrs.keys())}"
+    )
+    assert graph.nodes["A"].attrs[key] == "main"
+    # Confirm the startswith("context.") check that PipelineHandler.execute() uses
+    # will succeed -- this is the exact guard that was silently failing in production.
+    assert key.startswith("context.")

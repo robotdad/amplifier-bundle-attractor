@@ -74,6 +74,7 @@ class HandlerRegistry:
                 backend=kwargs.get("backend"),
                 hooks=self._hooks,
                 cancel_event=kwargs.get("cancel_event"),
+                interviewer=kwargs.get("interviewer"),
             ),
             "parallel": ParallelHandler(
                 subgraph_runner=kwargs.get("subgraph_runner"),

@@ -109,12 +109,14 @@ class ManagerLoopHandler:
         hooks: Any = None,
         cancel_event: Any = None,
         handler_registry_factory: Any | None = None,
+        interviewer: Any = None,
     ) -> None:
         self._runner = subgraph_runner
         self._backend = backend
         self._hooks = hooks
         self._cancel_event = cancel_event
         self._handler_registry_factory = handler_registry_factory
+        self._interviewer = interviewer
         self._subgraph_runs: dict[str, dict[str, Any]] = {}
 
     async def execute(
@@ -312,7 +314,27 @@ class ManagerLoopHandler:
         )
         os.makedirs(child_logs, exist_ok=True)
 
-        # Create child HandlerRegistry and PipelineEngine
+        # Create child PipelineEngine with placeholder registry first
+        # so the subgraph_runner closure can capture the engine reference.
+        child_engine = PipelineEngine(
+            graph=child_graph,
+            context=child_context,
+            handler_registry=HandlerRegistry(backend=self._backend),
+            logs_root=child_logs,
+            hooks=self._hooks,
+            cancel_event=self._cancel_event,
+        )
+
+        # Closure captures child_engine for subgraph execution
+        async def child_subgraph_runner(
+            node_id: str,
+            branch_context: "PipelineContext",
+            _graph: Any,
+            _logs_root: str,
+        ) -> "Outcome":
+            return await child_engine._run_from(node_id, context=branch_context)
+
+        # Real registry with all kwargs including subgraph_runner
         if self._handler_registry_factory is not None:
             child_registry = self._handler_registry_factory()
         else:
@@ -320,13 +342,10 @@ class ManagerLoopHandler:
                 backend=self._backend,
                 hooks=self._hooks,
                 cancel_event=self._cancel_event,
+                interviewer=self._interviewer,
+                subgraph_runner=child_subgraph_runner,
             )
-        child_engine = PipelineEngine(
-            graph=child_graph,
-            context=child_context,
-            handler_registry=child_registry,
-            logs_root=child_logs,
-        )
+        child_engine.handler_registry = child_registry
 
         # Run child engine
         try:

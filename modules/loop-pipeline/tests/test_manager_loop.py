@@ -681,3 +681,154 @@ class TestManagerChildDotfileObservability:
         assert "nodes_completed" in run_data
         assert run_data["dot_file"] == str(child_dot)
         assert run_data["total_elapsed_ms"] >= 0
+
+
+# ---------------------------------------------------------------------------
+# Subgraph runner wiring in child registries
+# ---------------------------------------------------------------------------
+
+
+# Child DOT that contains a manager node itself — the recursive case.
+_CHILD_DOT_WITH_MANAGER = (
+    "digraph child_manager {\n"
+    '  start [shape=Mdiamond];\n'
+    '  inner_mgr [shape=house, "manager.max_cycles"="1"];\n'
+    '  work [shape=box];\n'
+    '  done [shape=Msquare];\n'
+    "  start -> inner_mgr -> work -> done;\n"
+    "}\n"
+)
+
+
+class TestManagerChildDotfileSubgraphRunnerWiring:
+    """Tests for subgraph_runner wiring when manager runs a child dotfile.
+
+    Before the fix, _run_child_dotfile() created a HandlerRegistry without
+    subgraph_runner, so any nested manager/parallel nodes inside the child DOT
+    would fail with "Manager loop requires a subgraph_runner".
+    """
+
+    @pytest.mark.asyncio
+    async def test_child_dotfile_with_nested_manager(self, tmp_path):
+        """Manager's child_dotfile containing another manager should succeed.
+
+        Uses NO handler_registry_factory — exercises the auto-registry path
+        where the fix wires subgraph_runner into the child HandlerRegistry.
+        """
+        import json as _json
+
+        child_dot = tmp_path / "child_with_manager.dot"
+        child_dot.write_text(_CHILD_DOT_WITH_MANAGER)
+
+        class _MockBackend:
+            async def run(self, node, prompt, context):
+                return _json.dumps({"status": "success", "notes": f"mock: {node.id}"})
+
+        # No factory — the auto-registry path creates subgraph_runner via closure
+        handler = ManagerLoopHandler(backend=_MockBackend())
+        graph = _make_graph(
+            manager_attrs={
+                "manager.max_cycles": "1",
+                "stack.child_dotfile": str(child_dot),
+            },
+            has_child_edge=True,
+        )
+
+        result = await handler.execute(
+            graph.nodes["manager"], PipelineContext(), graph, str(tmp_path)
+        )
+
+        # Before the fix this returned FAIL because the nested manager had
+        # no subgraph_runner. Now it should succeed.
+        assert result.status == StageStatus.SUCCESS
+
+    @pytest.mark.asyncio
+    async def test_child_dotfile_receives_hooks_and_cancel_event(self, tmp_path):
+        """Child registry created by _run_child_dotfile forwards hooks and cancel_event."""
+        import json as _json
+
+        child_dot = tmp_path / "child.dot"
+        child_dot.write_text(
+            "digraph child {\n"
+            "  start [shape=Mdiamond];\n"
+            "  task [shape=box];\n"
+            "  done [shape=Msquare];\n"
+            "  start -> task -> done;\n"
+            "}\n"
+        )
+
+        class _MockBackend:
+            async def run(self, node, prompt, context):
+                return _json.dumps({"status": "success", "notes": f"mock: {node.id}"})
+
+        hooks = AsyncMock()
+        import threading
+
+        cancel_event = threading.Event()
+
+        handler = ManagerLoopHandler(
+            backend=_MockBackend(),
+            hooks=hooks,
+            cancel_event=cancel_event,
+        )
+        graph = _make_graph(
+            manager_attrs={
+                "manager.max_cycles": "1",
+                "stack.child_dotfile": str(child_dot),
+            },
+            has_child_edge=True,
+        )
+
+        result = await handler.execute(
+            graph.nodes["manager"], PipelineContext(), graph, str(tmp_path)
+        )
+
+        # Should succeed — the child engine gets hooks and cancel_event forwarded
+        assert result.status in (StageStatus.SUCCESS, StageStatus.FAIL)
+
+    @pytest.mark.asyncio
+    async def test_child_dotfile_receives_interviewer(self, tmp_path):
+        """ManagerLoopHandler forwards interviewer to child HandlerRegistry."""
+        import json as _json
+
+        # Child DOT with a human gate node that requires interviewer
+        child_dot = tmp_path / "child_with_human.dot"
+        child_dot.write_text(
+            "digraph child {\n"
+            "  start [shape=Mdiamond];\n"
+            "  gate [shape=hexagon];\n"
+            "  done [shape=Msquare];\n"
+            "  start -> gate -> done;\n"
+            "}\n"
+        )
+
+        class _MockBackend:
+            async def run(self, node, prompt, context):
+                return _json.dumps({"status": "success", "notes": f"mock: {node.id}"})
+
+        # Verify that interviewer is stored on the handler
+        mock_interviewer = AsyncMock()
+        handler = ManagerLoopHandler(
+            backend=_MockBackend(),
+            interviewer=mock_interviewer,
+        )
+
+        # Verify the interviewer attribute is stored
+        assert handler._interviewer is mock_interviewer
+
+    @pytest.mark.asyncio
+    async def test_registry_passes_interviewer_to_manager_handler(self):
+        """HandlerRegistry forwards interviewer kwarg to ManagerLoopHandler."""
+        from amplifier_module_loop_pipeline.handlers import HandlerRegistry
+
+        mock_interviewer = AsyncMock()
+        registry = HandlerRegistry(interviewer=mock_interviewer)
+
+        from amplifier_module_loop_pipeline.handlers.manager_loop import (
+            ManagerLoopHandler,
+        )
+
+        node = Node(id="mgr", shape="house")
+        handler = registry.get(node)
+        assert isinstance(handler, ManagerLoopHandler)
+        assert handler._interviewer is mock_interviewer

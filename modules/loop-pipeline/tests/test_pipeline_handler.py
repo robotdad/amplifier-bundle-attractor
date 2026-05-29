@@ -934,6 +934,24 @@ digraph child_manager {
 }
 """
 
+# Child DOT containing a parallel (shape=component) node.
+_CHILD_DOT_WITH_PARALLEL = """\
+digraph child_with_parallel {
+    start [shape=Mdiamond]
+    par [shape=component]
+    b1 [shape=box, prompt="Branch 1"]
+    b2 [shape=box, prompt="Branch 2"]
+    fan_in [shape=tripleoctagon]
+    done [shape=Msquare]
+    start -> par
+    par -> b1
+    par -> b2
+    b1 -> fan_in
+    b2 -> fan_in
+    fan_in -> done
+}
+"""
+
 
 def _make_parent_graph_with_manager_child(tmp_path):
     """Write _CHILD_DOT_WITH_MANAGER to tmp_path and return a parent Graph."""
@@ -1112,4 +1130,85 @@ class TestChildRegistrySubgraphRunnerWiring:
             f"Manager node did not succeed — status={mgr_outcome_data['status']!r}, "
             f"failure_reason={mgr_outcome_data.get('failure_reason')!r}"
         )
+
+
+class TestPipelineHandlerSubgraphRunnerWiring:
+    """Tests for subgraph_runner wiring in child HandlerRegistry — parallel and factory-less paths.
+
+    Complements TestChildRegistrySubgraphRunnerWiring with additional coverage
+    for parallel (shape=component) nodes and the auto-registry path.
+    """
+
+    @pytest.mark.asyncio
+    async def test_child_pipeline_with_parallel_node(self, tmp_path):
+        """Child DOT containing shape=component should succeed with subgraph_runner wired.
+
+        Uses NO handler_registry_factory — exercises the auto-registry path.
+        """
+        child_dot = tmp_path / "child_with_parallel.dot"
+        child_dot.write_text(_CHILD_DOT_WITH_PARALLEL)
+
+        graph = Graph(
+            name="parent",
+            nodes={
+                "start": Node(id="start", shape="Mdiamond"),
+                "sub": Node(
+                    id="sub",
+                    shape="folder",
+                    type="pipeline",
+                    attrs={"dot_file": str(child_dot)},
+                ),
+                "done": Node(id="done", shape="Msquare"),
+            },
+            edges=[
+                Edge(from_node="start", to_node="sub"),
+                Edge(from_node="sub", to_node="done"),
+            ],
+            source_dir=str(tmp_path),
+        )
+
+        # No factory — the auto-registry path creates subgraph_runner via closure
+        handler = PipelineHandler(backend=_MockBackend())
+        context = PipelineContext()
+        logs_root = str(tmp_path / "logs")
+
+        outcome = await handler.execute(graph.nodes["sub"], context, graph, logs_root)
+
+        # Before the fix, parallel nodes in child DOT would have no subgraph_runner
+        assert outcome.status == StageStatus.SUCCESS
+
+    @pytest.mark.asyncio
+    async def test_child_registry_receives_subgraph_runner_without_factory(self, tmp_path):
+        """When no handler_registry_factory is set, the auto-created child registry
+        gets subgraph_runner wired in."""
+        child_dot = tmp_path / "child.dot"
+        child_dot.write_text(CHILD_DOT)
+
+        graph = Graph(
+            name="parent",
+            nodes={
+                "start": Node(id="start", shape="Mdiamond"),
+                "sub": Node(
+                    id="sub",
+                    shape="folder",
+                    type="pipeline",
+                    attrs={"dot_file": str(child_dot)},
+                ),
+                "done": Node(id="done", shape="Msquare"),
+            },
+            edges=[
+                Edge(from_node="start", to_node="sub"),
+                Edge(from_node="sub", to_node="done"),
+            ],
+            source_dir=str(tmp_path),
+        )
+
+        # Construct handler WITHOUT factory — exercises the auto-registry path
+        handler = PipelineHandler(backend=_MockBackend())
+        context = PipelineContext()
+        logs_root = str(tmp_path / "logs")
+
+        outcome = await handler.execute(graph.nodes["sub"], context, graph, logs_root)
+
+        # Should succeed — the auto-created registry has subgraph_runner
         assert outcome.status == StageStatus.SUCCESS

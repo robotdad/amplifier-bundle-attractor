@@ -963,6 +963,28 @@ class PipelineEngine:
             failure_reason=failure_reason,
         )
 
+    def _compute_graph_fingerprint(self) -> str:
+        """Compute a fingerprint for the current graph to detect checkpoint mismatch.
+
+        Uses the DOT source string when available; falls back to a stable sort of
+        node-id+shape pairs when dot_source is empty.
+
+        Issue #252: prevents cross-graph checkpoint pollution when two engines
+        share the same logs_root.
+        """
+        import hashlib
+
+        source = self.graph.dot_source
+        if not source:
+            # Fallback: stable sort of (node_id, shape) pairs
+            source = ",".join(
+                sorted(
+                    f"{nid}:{node.shape}"
+                    for nid, node in self.graph.nodes.items()
+                )
+            )
+        return hashlib.md5(source.encode()).hexdigest()  # noqa: S324 (non-crypto use)
+
     def _try_resume_from_checkpoint(self) -> bool:
         """Try to load and restore state from an existing checkpoint.
 
@@ -977,6 +999,19 @@ class PipelineEngine:
             cp = load_checkpoint(self._checkpoint_path)
         except (FileNotFoundError, KeyError, ValueError):
             logger.warning("Failed to load checkpoint, starting fresh")
+            return False
+
+        # Guard: discard checkpoints written for a different graph (issue #252).
+        # The empty-string default keeps pre-fix checkpoints loadable (backward compat).
+        current_fp = self._compute_graph_fingerprint()
+        if cp.graph_fingerprint and cp.graph_fingerprint != current_fp:
+            logger.warning(
+                "Checkpoint graph fingerprint mismatch "
+                "(checkpoint=%s…, current=%s…); "
+                "discarding stale checkpoint to prevent cross-graph pollution",
+                cp.graph_fingerprint[:8],
+                current_fp[:8],
+            )
             return False
 
         # Restore context from checkpoint
@@ -1045,6 +1080,7 @@ class PipelineEngine:
             node_outcomes=serialized_outcomes,
             timestamp=datetime.now(timezone.utc).isoformat(),
             logs=self.context.get_logs(),  # L-7: include logs in checkpoint
+            graph_fingerprint=self._compute_graph_fingerprint(),  # issue #252
         )
         save_checkpoint(cp, self._checkpoint_path)
 

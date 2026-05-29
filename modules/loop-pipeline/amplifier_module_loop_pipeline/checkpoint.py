@@ -31,6 +31,7 @@ class Checkpoint:
     timestamp: str
     node_retries: dict[str, int] = field(default_factory=dict)
     logs: list[str] = field(default_factory=list)  # L-7: execution log entries
+    graph_fingerprint: str = field(default="")  # issue #252: cross-graph pollution guard
 
     @property
     def completed_node_list(self) -> list[str]:
@@ -58,6 +59,7 @@ def save_checkpoint(checkpoint: Checkpoint, path: str) -> None:
         "timestamp": checkpoint.timestamp,
         "node_retries": checkpoint.node_retries,
         "logs": checkpoint.logs,  # L-7
+        "graph_fingerprint": checkpoint.graph_fingerprint,  # issue #252
     }
     with open(path, "w") as f:
         json.dump(data, f, indent=2, default=str)
@@ -80,4 +82,5 @@ def load_checkpoint(path: str) -> Checkpoint:
         timestamp=data.get("timestamp", ""),
         node_retries=data.get("node_retries", {}),
         logs=data.get("logs", []),  # L-7
+        graph_fingerprint=data.get("graph_fingerprint", ""),  # issue #252; "" keeps old checkpoints loadable
     )

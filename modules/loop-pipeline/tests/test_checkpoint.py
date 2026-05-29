@@ -359,3 +359,157 @@ class TestResumeFromCheckpoint:
         assert outcome.status in (StageStatus.SUCCESS, StageStatus.PARTIAL_SUCCESS)
         # Backend called for step (start is handled by StartHandler)
         assert "step" in backend.calls
+
+
+class TestGraphFingerprintIsolation:
+    """Issue #252: checkpoint pollution across graphs sharing the same logs_root."""
+
+    @pytest.mark.asyncio
+    async def test_stale_checkpoint_discarded_on_graph_mismatch(
+        self, tmp_path, caplog
+    ):
+        """Engine B (Graph G') must not consume Engine A's (Graph G) checkpoint
+        when both share the same logs_root.
+
+        RED on main (no guard), GREEN after fix (fingerprint mismatch discards
+        the stale checkpoint).
+        """
+        import logging
+
+        shared_logs = str(tmp_path / "shared-logs")
+
+        # Engine A: Graph G - runs fully, writes checkpoint with WorkerA + WorkerB
+        graph_g = """
+digraph {
+    start [shape=Mdiamond]
+    WorkerA [prompt="Work A"]
+    WorkerB [prompt="Work B"]
+    exit [shape=Msquare]
+    start -> WorkerA -> WorkerB -> exit
+}
+"""
+        engine_a = _make_engine(graph_g, backend=MockBackend("done"), logs_root=shared_logs)
+        outcome_a = await engine_a.run()
+        assert outcome_a.status in (StageStatus.SUCCESS, StageStatus.PARTIAL_SUCCESS)
+
+        # Confirm checkpoint was written and contains Engine A's nodes
+        checkpoint_path = os.path.join(shared_logs, "checkpoint.json")
+        assert os.path.exists(checkpoint_path)
+        with open(checkpoint_path) as f:
+            raw = json.load(f)
+        assert "WorkerA" in raw["completed_nodes"]
+
+        # Engine B: Graph G' - different structure, same logs_root
+        graph_g_prime = """
+digraph {
+    start [shape=Mdiamond]
+    NestedRegression [prompt="Nested work"]
+    exit [shape=Msquare]
+    start -> NestedRegression -> exit
+}
+"""
+        with caplog.at_level(
+            logging.WARNING, logger="amplifier_module_loop_pipeline.engine"
+        ):
+            engine_b = _make_engine(
+                graph_g_prime, backend=MockBackend("done"), logs_root=shared_logs
+            )
+            outcome_b = await engine_b.run()
+
+        # Engine B must NOT have stale entries from Engine A's graph
+        assert "WorkerA" not in engine_b.node_outcomes, (
+            "stale WorkerA from Engine A must not appear in Engine B's node_outcomes"
+        )
+        assert "WorkerB" not in engine_b.node_outcomes, (
+            "stale WorkerB from Engine A must not appear in Engine B's node_outcomes"
+        )
+        # Engine B must complete its own graph successfully
+        assert outcome_b.status in (StageStatus.SUCCESS, StageStatus.PARTIAL_SUCCESS)
+
+    @pytest.mark.asyncio
+    async def test_checkpoint_accepted_on_matching_graph(self, tmp_path):
+        """Resume still works when Engine B runs the same graph as Engine A.
+
+        Should be GREEN on both main and after fix — same graph means same
+        fingerprint, so the guard does not discard the checkpoint.
+        """
+        shared_logs = str(tmp_path / "logs")
+        dot = """
+digraph {
+    start [shape=Mdiamond]
+    plan [prompt="Plan"]
+    implement [prompt="Implement"]
+    exit [shape=Msquare]
+    start -> plan -> implement -> exit
+}
+"""
+        # Engine A: runs the full graph, writes checkpoint
+        backend_a = MockBackend("done")
+        engine_a = _make_engine(dot, backend=backend_a, logs_root=shared_logs)
+        await engine_a.run()
+
+        # Engine B: fresh engine, SAME graph, same logs_root -> must resume
+        backend_b = MockBackend("done")
+        engine_b = _make_engine(dot, backend=backend_b, logs_root=shared_logs)
+        outcome_b = await engine_b.run()
+
+        assert outcome_b.status in (StageStatus.SUCCESS, StageStatus.PARTIAL_SUCCESS)
+        # Backend B must NOT be called — all nodes already completed by Engine A
+        assert backend_b.calls == [], (
+            f"Backend should not be called when all nodes are resumed; "
+            f"got {backend_b.calls}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_backward_compat_checkpoint_without_fingerprint_still_resumes(
+        self, tmp_path
+    ):
+        """Old-style checkpoints without graph_fingerprint must still enable resume.
+
+        The backward-compat guard ``if cp.graph_fingerprint and ...`` is falsy for
+        the empty-string default, so pre-fix checkpoints are always accepted.
+
+        Should be GREEN on both main and after fix.
+        """
+        logs = str(tmp_path / "logs")
+        os.makedirs(logs, exist_ok=True)
+
+        # Handcrafted old-style checkpoint JSON: NO graph_fingerprint field
+        old_checkpoint = {
+            "current_node": "plan",
+            "completed_nodes": {"start": "success", "plan": "success"},
+            "context": {"graph.goal": ""},
+            "node_outcomes": {
+                "start": {"status": "success"},
+                "plan": {"status": "success"},
+            },
+            "timestamp": "2025-01-01T00:00:00Z",
+            "node_retries": {},
+            "logs": [],
+            # Intentionally NO "graph_fingerprint" key — simulates pre-fix checkpoint
+        }
+        with open(os.path.join(logs, "checkpoint.json"), "w") as f:
+            json.dump(old_checkpoint, f)
+
+        dot = """
+digraph {
+    start [shape=Mdiamond]
+    plan [prompt="Plan"]
+    implement [prompt="Implement"]
+    exit [shape=Msquare]
+    start -> plan -> implement -> exit
+}
+"""
+        backend = MockBackend("done")
+        engine = _make_engine(dot, backend=backend, logs_root=logs)
+        outcome = await engine.run()
+
+        assert outcome.status in (StageStatus.SUCCESS, StageStatus.PARTIAL_SUCCESS)
+        # implement must have been executed (was NOT in old checkpoint)
+        assert "implement" in backend.calls, (
+            "implement should have been executed (not in old checkpoint)"
+        )
+        # plan must NOT have been executed (was in old checkpoint)
+        assert "plan" not in backend.calls, (
+            "plan should have been skipped (was already in old checkpoint)"
+        )

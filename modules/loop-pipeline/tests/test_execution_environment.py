@@ -551,7 +551,8 @@ async def test_full_lifecycle_orchestrator_and_backend(tmp_path):
                 context_updates={"last_stage": node.id},
             )
 
-    # Use tmp_path for logs_root to avoid stale checkpoint contamination
+    # Use tmp_path for logs_root for isolation hygiene (issue #252 graph-fingerprint guard
+    # now prevents stale checkpoint contamination across engines)
     orchestrator = PipelineOrchestrator(
         {
             "dot_source": TWO_NODE_DOT,

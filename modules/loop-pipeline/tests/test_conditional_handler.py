@@ -16,7 +16,6 @@ Two contract assertions:
    No LLM call, no tool invocation, completes in microseconds.
 """
 
-import asyncio
 import time
 
 import pytest

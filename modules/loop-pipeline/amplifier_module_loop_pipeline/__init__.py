@@ -510,35 +510,22 @@ class PipelineOrchestrator:
                     "to local execution"
                 )
 
-        # 8. Create engine first (handlers need its _run_from method)
-        # Use a placeholder registry, then replace after wiring
+        # 8. Create registry (no closures, no rewire — engine passes self at call time)
+        registry = HandlerRegistry(
+            backend=backend,
+            hooks=hooks,
+        )
+
+        # 9. Create engine (carries itself to handlers via execute(engine=...))
         engine = PipelineEngine(
             graph=graph,
             context=pipeline_context,
-            handler_registry=HandlerRegistry(backend=backend),  # temp
+            handler_registry=registry,
             logs_root=logs_root,
             hooks=hooks,
         )
 
-        # 9. Create subgraph runner closure that delegates to engine._run_from
-        async def subgraph_runner(
-            node_id: str,
-            branch_context: PipelineContext,
-            _graph: Any,
-            _logs_root: str,
-        ) -> Outcome:
-            """Execute a subgraph branch via the engine."""
-            return await engine._run_from(node_id, context=branch_context)
-
-        # 10. Register handlers with the subgraph runner wired in
-        registry = HandlerRegistry(
-            backend=backend,
-            subgraph_runner=subgraph_runner,
-            hooks=hooks,
-        )
-        engine.handler_registry = registry
-
-        # 11. Run the engine (with environment teardown in finally)
+        # 10. Run the engine (with environment teardown in finally)
         try:
             outcome = await engine.run(goal=prompt or None)
         finally:

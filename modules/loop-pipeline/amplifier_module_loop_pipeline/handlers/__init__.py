@@ -10,12 +10,15 @@ Spec coverage: HAND-001–007, Section 4.1–4.2.
 
 from __future__ import annotations
 
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from ..context import PipelineContext
 from ..graph import Graph, Node
 from ..outcome import Outcome
 from ..validation import SHAPE_TO_HANDLER
+
+if TYPE_CHECKING:
+    from ..engine import PipelineEngine
 
 
 @runtime_checkable
@@ -31,6 +34,8 @@ class NodeHandler(Protocol):
         context: PipelineContext,
         graph: Graph,
         logs_root: str,
+        *,
+        engine: "PipelineEngine | None" = None,
     ) -> Outcome: ...
 
 
@@ -70,13 +75,11 @@ class HandlerRegistry:
                 hooks=self._hooks,
             ),
             "stack.manager_loop": ManagerLoopHandler(
-                subgraph_runner=kwargs.get("subgraph_runner"),
                 backend=kwargs.get("backend"),
                 hooks=self._hooks,
                 cancel_event=kwargs.get("cancel_event"),
             ),
             "parallel": ParallelHandler(
-                subgraph_runner=kwargs.get("subgraph_runner"),
                 hooks=self._hooks,
             ),
             "parallel.fan_in": FanInHandler(),

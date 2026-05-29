@@ -399,7 +399,7 @@ def test_registry_custom_handler_registration():
     """Custom handlers can be registered and resolved (HAND-005)."""
 
     class CustomHandler:
-        async def execute(self, node, context, graph, logs_root):
+        async def execute(self, node, context, graph, logs_root, *, engine=None):
             return Outcome(status=StageStatus.SUCCESS, notes="custom")
 
     registry = HandlerRegistry()
@@ -442,9 +442,7 @@ def test_registry_node_type_steer_falls_to_shape():
 def test_registry_type_takes_priority_over_node_type():
     """Explicit type= attribute takes priority over node_type."""
     registry = HandlerRegistry()
-    node = Node(
-        id="x", shape="box", type="tool", attrs={"node_type": "codergen"}
-    )
+    node = Node(id="x", shape="box", type="tool", attrs={"node_type": "codergen"})
     handler = registry.get(node)
     assert isinstance(handler, ToolHandler)
 
@@ -473,7 +471,7 @@ def test_registry_register_replaces_existing():
     assert isinstance(original, StartHandler)
 
     class NewStart:
-        async def execute(self, node, context, graph, logs_root):
+        async def execute(self, node, context, graph, logs_root, *, engine=None):
             return Outcome(status=StageStatus.SUCCESS, notes="new start")
 
     registry.register("start", NewStart())

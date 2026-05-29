@@ -148,7 +148,7 @@ class PipelineEngine:
 
         # Bound total pipeline steps to prevent infinite loops caused by
         # condition-routing bugs or missing edge guards. Matches the safety
-        # bound used in the subgraph runner (_run_from).
+        # bound used in the subgraph runner (run_subgraph).
         max_steps = len(self.graph.nodes) * self._MAX_GOAL_GATE_RETRIES
         steps = 0
 
@@ -418,6 +418,7 @@ class PipelineEngine:
                                 self.logs_root,
                                 retry_policy,
                                 hooks=self.hooks,
+                                engine=self,
                             )
                     except asyncio.TimeoutError:
                         node_duration_ms = (time.monotonic() - node_start_time) * 1000
@@ -447,6 +448,7 @@ class PipelineEngine:
                         self.logs_root,
                         retry_policy,
                         hooks=self.hooks,
+                        engine=self,
                     )
             node_duration_ms = (time.monotonic() - node_start_time) * 1000
 
@@ -586,7 +588,7 @@ class PipelineEngine:
             #
             # BUG G FIX: Component nodes (shape=component) are handled by
             # ParallelHandler, which fans out ALL outgoing branches internally
-            # via the subgraph_runner (_run_from) and populates parallel.results
+            # via run_subgraph and populates parallel.results
             # in context.  The engine must NOT re-fan-out via
             # _execute_parallel_fan_out after the handler returns — that would
             # execute each branch a second time.
@@ -735,7 +737,7 @@ class PipelineEngine:
             # Step 7: Advance to next node
             current_node = self.graph.nodes[edge.to_node]
 
-    async def _run_from(
+    async def run_subgraph(
         self,
         start_node_id: str,
         *,
@@ -796,7 +798,7 @@ class PipelineEngine:
             else:
                 try:
                     outcome = await handler.execute(
-                        current_node, ctx, self.graph, self.logs_root
+                        current_node, ctx, self.graph, self.logs_root, engine=self
                     )
                 except Exception as exc:
                     return Outcome(
@@ -826,6 +828,10 @@ class PipelineEngine:
             status=StageStatus.FAIL,
             failure_reason=f"Subgraph exceeded {max_steps} steps (safety bound)",
         )
+
+    # Backward compat: _run_from was the pre-refactor private method name.
+    # Will be removed in a future release.
+    _run_from = run_subgraph
 
     def _initialize_context(self, goal: str | None) -> None:
         """Mirror graph attributes into context.
@@ -1152,6 +1158,7 @@ class PipelineEngine:
                     self.logs_root,
                     retry_policy,
                     hooks=self.hooks,
+                    engine=self,
                 )
             except Exception as exc:
                 outcome = Outcome(

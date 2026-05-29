@@ -59,6 +59,8 @@ class FailingToolHandler:
         context: PipelineContext,
         graph: Graph,
         logs_root: str,
+        *,
+        engine=None,
     ) -> Outcome:
         return Outcome(status=StageStatus.FAIL, failure_reason="tool simulated failure")
 

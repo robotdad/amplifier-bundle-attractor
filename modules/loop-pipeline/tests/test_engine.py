@@ -1049,7 +1049,9 @@ async def test_main_loop_safety_bound_terminates_infinite_cycle(tmp_path):
         work  -> work
     }
     """
-    engine = _make_engine(dot_source=dot_source, backend=MockBackend(), logs_root=str(tmp_path))
+    engine = _make_engine(
+        dot_source=dot_source, backend=MockBackend(), logs_root=str(tmp_path)
+    )
 
     # Patch the class constant so max_steps = 3 nodes × 2 = 6 steps
     with patch.object(type(engine), "_MAX_GOAL_GATE_RETRIES", new=2):

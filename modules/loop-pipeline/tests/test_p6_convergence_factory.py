@@ -57,6 +57,8 @@ class MockToolHandler:
         context: PipelineContext,
         graph: Graph,
         logs_root: str,
+        *,
+        engine=None,
     ) -> Outcome:
         return Outcome(status=StageStatus.SUCCESS, notes="Mock validation passed")
 

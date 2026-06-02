@@ -21,6 +21,7 @@ from ..context import PipelineContext
 from ..dot_parser import parse_dot
 from ..graph import Graph, Node
 from ..outcome import Outcome, StageStatus
+from ..substitution import substitute_context
 
 logger = logging.getLogger(__name__)
 
@@ -158,10 +159,15 @@ class PipelineHandler:
         child_context = context.clone()
 
         # (6b) Inject context.* attributes from this folder node into child context.
+        # Pre-substitute each attr value against the parent snapshot so that
+        # template tokens like "${build.artifact_id}" resolve to their runtime
+        # values rather than being stored as raw strings.
+        parent_snapshot = context.snapshot()
         for attr_key, attr_value in node.attrs.items():
             if attr_key.startswith("context."):
                 child_key = attr_key[len("context.") :]
-                child_context.set(child_key, str(attr_value))
+                resolved = substitute_context(str(attr_value), parent_snapshot)
+                child_context.set(child_key, resolved)
 
         # (7) Create child logs dir
         child_logs = os.path.join(logs_root, f"subgraph_{node.id}")

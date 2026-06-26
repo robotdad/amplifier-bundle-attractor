@@ -55,19 +55,14 @@ tools:
     source: git+https://github.com/microsoft/amplifier-module-tool-search@main
 
 hooks:
-  - module: hooks-logging
+  # File-only context-intelligence: writes an eval-compatible events.jsonl
+  # (llm:response with token usage) to the session dir. NO server/destination
+  # configured -> local JSONL only, zero network. Matches the amplifier-evaluation
+  # harness's expected events.jsonl source.
+  - module: hook-context-intelligence
+    source: git+https://github.com/microsoft/amplifier-bundle-context-intelligence@main#subdirectory=modules/hook-context-intelligence
     config:
-      additional_events:
-        - "pipeline:start"
-        - "pipeline:complete"
-        - "pipeline:node_start"
-        - "pipeline:node_complete"
-        - "pipeline:edge_selected"
-        - "pipeline:checkpoint"
-        - "pipeline:goal_gate_check"
-        - "pipeline:error"
-        - "pipeline:stage_retrying"
-        - "pipeline:stage_failed"
+      log_level: INFO
 
 context:
   include:

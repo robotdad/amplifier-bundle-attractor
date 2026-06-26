@@ -8,14 +8,23 @@ includes:
 
 agents:
   attractor-gemini:
-    bundle: attractor:profiles/attractor-profile-gemini
     description: Gemini coding agent for pipeline nodes
+    # CRITICAL: the spawner merges the agent's 'session:' override onto the parent
+    # config — it does NOT resolve a bare 'bundle:' reference. Without an inline
+    # session.orchestrator override the spawned child inherits the parent's
+    # loop-pipeline orchestrator and recurses infinitely. Inline loop-agent here.
+    session:
+      orchestrator:
+        module: loop-agent
+        source: git+https://github.com/microsoft/amplifier-bundle-attractor@main#subdirectory=modules/loop-agent
+        config:
+          default_command_timeout_ms: 120000
 
 providers:
   - module: provider-gemini
     source: git+https://github.com/microsoft/amplifier-module-provider-gemini@main
     config:
-      default_model: gemini-2.5-pro
+      default_model: gemini-2.5-flash-lite
   - module: provider-mock
     source: git+https://github.com/microsoft/amplifier-module-provider-mock@main
 

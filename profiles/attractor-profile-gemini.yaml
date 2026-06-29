@@ -19,6 +19,12 @@ session:
     source: git+https://github.com/microsoft/amplifier-bundle-attractor@main#subdirectory=modules/loop-agent
     config:
       default_command_timeout_ms: 10000
+  # session.context is REQUIRED by core 1.6.0 ("Configuration must specify
+  # session.context"). This profile only includes attractor-core (which provides
+  # no context module), so it must be declared explicitly here.
+  context:
+    module: context-simple
+    source: git+https://github.com/microsoft/amplifier-module-context-simple@main
 
 tools:
   - module: tool-filesystem
@@ -31,8 +37,3 @@ tools:
     source: git+https://github.com/microsoft/amplifier-module-tool-search@main
   - module: tool-web
     source: git+https://github.com/microsoft/amplifier-module-tool-web@main
-
-context:
-  # '../context/' climbs from this YAML's dir to the bundle-root context/; idiomatic target is 'attractor:context/...' pending foundation namespaced-include support.
-  include:
-    - ../context/system-gemini.md

@@ -34,6 +34,6 @@ session:
     source: git+https://github.com/microsoft/amplifier-module-context-simple@main
 
 context:
+  # Layer-4 additive context only (not base prompt — that is now in orchestrator config above).
   include:
-    - ../context/system-openai.md
     - ../context/isolated-environment-guidance.md

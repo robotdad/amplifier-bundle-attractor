@@ -37,11 +37,6 @@ tools:
   - module: tool-report-outcome
     source: git+https://github.com/microsoft/amplifier-bundle-attractor@main#subdirectory=modules/tool-report-outcome
 
-context:
-  # '../context/' climbs from this YAML's dir to the bundle-root context/; idiomatic target is 'attractor:context/...' pending foundation namespaced-include support.
-  include:
-    - ../context/system-anthropic.md
-
 hooks:
   - module: hooks-tool-truncation
     source: git+https://github.com/microsoft/amplifier-bundle-attractor@main#subdirectory=modules/hooks-tool-truncation

@@ -34,6 +34,9 @@ session:
     config:
       max_tool_rounds_per_input: 50
       default_command_timeout_ms: 120000
+      # Layer-1 base comes from loop-agent's provider default
+      # (context/system-anthropic.md). The context.include below
+      # (pipeline-awareness, dot-reference) is ADDITIVE context, not the base.
   context:
     module: context-simple
     source: git+https://github.com/microsoft/amplifier-module-context-simple@main
@@ -57,11 +60,9 @@ tools:
         openai: attractor-agent-openai
         gemini: attractor-agent-gemini
 
-# Context: standard system prompt + pipeline awareness
 context:
   # '../context/' climbs from this YAML's dir to the bundle-root context/; idiomatic target is 'attractor:context/...' pending foundation namespaced-include support.
   include:
-    - ../context/system-anthropic.md
     - ../context/pipeline-awareness.md
     - ../context/dot-reference.md
 

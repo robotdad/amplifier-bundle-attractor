@@ -56,6 +56,10 @@ tools:
 # the agent's session: key onto the parent config; without an explicit session.orchestrator
 # the child inherits the parent's loop-pipeline orchestrator and recurses.
 agents:
+  # Inline session.orchestrator is REQUIRED (passes the loop-pipeline recursion
+  # guard, which checks orchestrator.module). The Layer-1 base prompt is supplied
+  # by loop-agent's provider default (context/system-<provider>.md), so no
+  # per-agent system_prompt_file is needed here.
   attractor-agent-anthropic:
     description: >
       Anthropic coding agent (Claude Code aligned).
